@@ -31,7 +31,7 @@ jobs:
         working-directory: FE
         env:
           VITE_DEVEXTREME_LICENSE: ${{ secrets.VITE_DEVEXTREME_LICENSE }}
-          GITHUB_PAGES: 'true'
+          DEPLOY_TARGET: 'gh-pages'
         run: npm run build
 
       - name: Deploy to GitHub Pages
