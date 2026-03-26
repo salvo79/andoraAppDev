@@ -1,0 +1,18 @@
+# Secretos de producción - NUNCA commitear
+**/appsettings.Production.json
+
+# Build outputs
+**/bin/
+**/obj/
+
+# User secrets
+**/.secrets/
+**/secrets.json
+
+# VS / Rider
+.vs/
+.idea/
+*.user
+
+# Logs
+*.log
