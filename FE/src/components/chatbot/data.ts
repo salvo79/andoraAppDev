@@ -1,0 +1,71 @@
+import { CustomStore, DataSource } from 'devextreme-vue/common/data';
+import { type DxChatTypes } from 'devextreme-vue/chat';
+import { unified } from 'unified';
+import remarkParse from 'remark-parse';
+import remarkRehype from 'remark-rehype';
+import rehypeStringify from 'rehype-stringify';
+import rehypeMinifyWhitespace from 'rehype-minify-whitespace';
+
+export const dictionary = {
+  en: {
+    'dxChat-emptyListMessage': 'Chat is Empty',
+    'dxChat-emptyListPrompt': 'AI Assistant is ready to answer your questions.',
+    'dxChat-textareaPlaceholder': 'Ask AI Assistant...',
+  },
+};
+
+export const AzureOpenAIConfig = {
+  dangerouslyAllowBrowser: true,
+  deployment: 'gpt-4o-mini',
+  apiVersion: '2024-02-01',
+  endpoint: 'https://public-api.devexpress.com/demo-openai',
+  apiKey: 'DEMO',
+};
+
+export const REGENERATION_TEXT = 'Regeneration...';
+export const CHAT_DISABLED_CLASS = 'chat-disabled';
+export const ALERT_TIMEOUT = 1000 * 60;
+
+export const user = {
+  id: 'user',
+};
+
+export const assistant = {
+  id: 'assistant',
+  name: 'Virtual Assistant',
+};
+
+export const messages: DxChatTypes.Message[] = [];
+const store: DxChatTypes.Message[] = [];
+
+const customStore = new CustomStore<DxChatTypes.Message>({
+  key: 'id',
+  load: () => new Promise((resolve) => {
+    setTimeout(() => {
+      resolve([...store]);
+    }, 0);
+  }),
+  insert: (message: DxChatTypes.Message) => new Promise((resolve) => {
+    setTimeout(() => {
+      store.push(message);
+      resolve(message);
+    });
+  }),
+});
+
+export const dataSource = new DataSource({
+  store: customStore,
+  paginate: false,
+});
+
+export function convertToHtml(value: string) {
+  const result = unified()
+    .use(remarkParse)
+    .use(remarkRehype)
+    .use(rehypeMinifyWhitespace)
+    .use(rehypeStringify)
+    .processSync(value)
+    .toString();
+
+  return result;
+}

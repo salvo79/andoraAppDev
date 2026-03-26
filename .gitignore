@@ -1,0 +1,5 @@
+FE/.env.local/
+FE/node_modules/
+**/appsettings.Production.json
+.DS_Store
+Thumbs.db

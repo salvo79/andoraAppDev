@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400">
+  <defs>
+    <!-- Gradient for the A shape - deep blue to cyan -->
+    <linearGradient id="gradA" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a3fc4;stop-opacity:1" />
+      <stop offset="60%" style="stop-color:#1e6fe8;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#00c9b1;stop-opacity:1" />
+    </linearGradient>
+
+    <!-- Gradient for the swoosh/ellipse -->
+    <linearGradient id="gradSwoosh" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#1a7fd4;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#00d4b8;stop-opacity:1" />
+    </linearGradient>
+
+    <!-- Gradient for the dot -->
+    <linearGradient id="gradDot" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#00d4b8;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#00b89e;stop-opacity:1" />
+    </linearGradient>
+
+    <!-- 3D shading for A left leg -->
+    <linearGradient id="gradALeft" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#1230a0;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1a55d4;stop-opacity:1" />
+    </linearGradient>
+
+    <!-- 3D shading for A right leg -->
+    <linearGradient id="gradARight" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#1a6fe0;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#3db8f5;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- A shape - left leg (darker, 3D effect) -->
+  <path d="M 90 340 L 190 80 L 220 80 L 150 310 Z"
+        fill="url(#gradALeft)" />
+
+  <!-- A shape - right leg -->
+  <path d="M 190 80 L 310 340 L 270 340 L 195 130 Z"
+        fill="url(#gradARight)" />
+
+  <!-- A crossbar cutout area - white space between legs -->
+  <!-- Left leg outer face -->
+  <path d="M 85 345 L 95 345 L 185 95 L 195 85 L 215 85 L 155 255 L 145 280 Z"
+        fill="url(#gradA)" opacity="0.15"/>
+
+  <!-- Swoosh ellipse - the orbital ring -->
+  <ellipse cx="210" cy="268" rx="115" ry="28"
+           transform="rotate(-20, 210, 268)"
+           fill="none"
+           stroke="url(#gradSwoosh)"
+           stroke-width="22"
+           stroke-linecap="round"
+           opacity="0.92"/>
+
+  <!-- Swoosh ellipse inner highlight -->
+  <ellipse cx="210" cy="268" rx="115" ry="28"
+           transform="rotate(-20, 210, 268)"
+           fill="none"
+           stroke="white"
+           stroke-width="4"
+           stroke-linecap="round"
+           opacity="0.18"/>
+
+  <!-- Dot (the "i" dot) -->
+  <circle cx="298" cy="148" r="22" fill="url(#gradDot)" />
+  <!-- Dot shine -->
+  <circle cx="290" cy="140" r="7" fill="white" opacity="0.3" />
+
+  <!-- Main A shape redrawn on top for clean look -->
+  <!-- Left leg of A -->
+  <path d="M 92 342 L 196 76 L 218 76 L 155 260 L 128 342 Z"
+        fill="url(#gradALeft)" />
+
+  <!-- Right leg of A -->
+  <path d="M 196 76 L 312 342 L 278 342 L 210 160 L 196 76 Z"
+        fill="url(#gradARight)" />
+
+  <!-- Inner gap of A (transparent cutout) -->
+  <path d="M 155 260 L 175 200 L 210 160 L 228 210 L 245 260 Z"
+        fill="white" opacity="0.0"/>
+
+  <!-- Crossbar area light face -->
+  <path d="M 148 275 L 155 255 L 245 255 L 252 275 Z"
+        fill="white" opacity="0.08"/>
+</svg>
