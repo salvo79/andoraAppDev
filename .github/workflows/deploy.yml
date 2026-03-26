@@ -46,4 +46,4 @@ jobs:
             --platform managed \
             --allow-unauthenticated \
             --port 8080 \
-            --set-env-vars "JwtSettings__Key=${{ secrets.JWT_KEY }},EmailSettings__ResendApiKey=${{ secrets.RESEND_API_KEY }}"
+            --set-env-vars "JwtSettings__Key=${{ secrets.JWT_KEY }},EmailSettings__ResendApiKey=${{ secrets.RESEND_API_KEY }},MongoSettings__ConnectionString=${{ secrets.MONGO_CONNECTION_STRING }}"
