@@ -7,6 +7,7 @@ import AppBreadcrumb from './AppBreadcrumb.vue';
 const router = useRouter();
 const auth = useAuthStore();
 const { layoutState, isDarkTheme, toggleMenu, toggleConfigSidebar } = useLayout();
+const baseUrl = import.meta.env.BASE_URL;
 
 
 function logout() {
@@ -118,10 +119,10 @@ function showRightMenu() {
             <a tabindex="0" class="menu-button" @click="toggleMenu">
                 <i class="pi pi-chevron-left" />
             </a>
-            <img class="horizontal-logo" src="/layout/images/logo-white.svg" alt="poseidon-layout" />
+            <img class="horizontal-logo" :src="`${baseUrl}andora.svg`" alt="anDora" />
             <span class="topbar-separator" />
             <AppBreadcrumb />
-            <RouterLink to="/"><img class="mobile-logo" :src="`/layout/images/logo-${isDarkTheme ? 'white' : 'dark'}.svg`" alt="poseidon-layout" /></RouterLink>
+            <RouterLink to="/"><img class="mobile-logo" :src="`${baseUrl}andora.svg`" alt="anDora" /></RouterLink>
         </div>
 
         <div class="topbar-right">

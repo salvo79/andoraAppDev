@@ -5,6 +5,8 @@ import { useRoute } from 'vue-router';
 import AppMenu from './AppMenu.vue';
 import AppTopbar from './AppTopbar.vue';
 
+const baseUrl = import.meta.env.BASE_URL;
+
 const BREAKPOINT = 992;
 const mediaQuery = window.matchMedia(`(min-width: ${BREAKPOINT}px)`);
 const { layoutConfig, layoutState, isDesktop, isHorizontal, isSlim, isCompact, hasOpenOverlay, hasOverlaySubmenu, hasOpenOverlaySubmenu } = useLayout();
@@ -178,8 +180,8 @@ onBeforeUnmount(() => {
     <div ref="sidebarRef" class="layout-sidebar" @mouseenter="onMouseEnter" @mouseleave="onMouseLeave">
         <div class="sidebar-header">
             <router-link :to="{ name: 'e-commerce' }" class="logo">
-                <img class="logo-image" :src="!layoutConfig.darkTheme ? '/layout/images/logo-dark.svg' : '/layout/images/logo-white.svg'" alt="poseidon-layout" />
-                <span class="app-name text-4xl font-medium leading-normal">Poseidon</span>
+                <img class="logo-image" :src="`${baseUrl}andora.svg`" alt="anDora" />
+                <span class="app-name text-4xl font-medium leading-normal">anDora</span>
             </router-link>
             <button class="layout-sidebar-anchor" type="button" @click="onAnchorToggle" />
         </div>
