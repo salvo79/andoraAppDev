@@ -32,6 +32,7 @@ jobs:
         env:
           VITE_DEVEXTREME_LICENSE: ${{ secrets.VITE_DEVEXTREME_LICENSE }}
           DEPLOY_TARGET: 'gh-pages'
+          VITE_API_URL: 'https://andora-app-843120821405.us-central1.run.app/api'
         run: npm run build
 
       - name: Deploy to GitHub Pages
