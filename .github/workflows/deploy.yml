@@ -38,9 +38,9 @@ jobs:
 
       - name: Test AR access
         run: |
+          echo "Is project 'andora-dev': $([ "$PROJECT_ID" = "andora-dev" ] && echo YES || echo NO)"
+          echo "Configured project: $(gcloud config get-value project)"
           TOKEN=$(gcloud auth print-access-token)
-          echo "Token email:"
-          curl -s "https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=$TOKEN" | python3 -m json.tool
           echo "AR repository access:"
           curl -s -w "\nHTTP:%{http_code}" \
             -H "Authorization: Bearer $TOKEN" \
