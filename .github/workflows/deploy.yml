@@ -36,6 +36,16 @@ jobs:
             -t ${{ env.IMAGE }}:latest \
             ./BE
 
+      - name: Test AR access
+        run: |
+          TOKEN=$(gcloud auth print-access-token)
+          echo "Token email:"
+          curl -s "https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=$TOKEN" | python3 -m json.tool
+          echo "AR repository access:"
+          curl -s -w "\nHTTP:%{http_code}" \
+            -H "Authorization: Bearer $TOKEN" \
+            "https://artifactregistry.googleapis.com/v1/projects/$PROJECT_ID/locations/us-central1/repositories/andora-app"
+
       - name: Push Docker image
         run: |
           docker push ${{ env.IMAGE }}:${{ github.sha }}
