@@ -1,5 +1,6 @@
 # Secretos de producción - NUNCA commitear
 **/appsettings.Production.json
+**/appsettings.Development.json
 FE/.env.local/
 
 # Build outputs
