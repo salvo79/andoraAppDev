@@ -48,13 +48,14 @@ const login = async () => {
     //auth.loadSession()
 
 
-auth.user = response.data.username
-auth.isAuthenticated = true
-auth.token = token
+    auth.user = response.data.username
+    auth.isAuthenticated = true
 
-
-//console.log(auth.isAuthenticated)
-
+    // Load profile photo into store
+    try {
+      const profile = await api.get('/profile')
+      if (profile.data.profilePhoto) auth.setProfilePhoto(profile.data.profilePhoto)
+    } catch { /* no photo yet */ }
 
     toast.add({
       severity: 'success',

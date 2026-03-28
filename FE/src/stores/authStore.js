@@ -36,6 +36,7 @@ export const useAuthStore = defineStore('auth', {
             this.isAuthenticated = false;
             this.profilePhoto = null;
             localStorage.removeItem('token');
+            localStorage.removeItem('profilePhoto');
         },
 
         loadSession() {
@@ -47,6 +48,7 @@ export const useAuthStore = defineStore('auth', {
                     if (username) {
                         this.user = username;
                         this.isAuthenticated = true;
+                        this.profilePhoto = localStorage.getItem('profilePhoto') || null;
                     }
                 } catch {
                     this.isAuthenticated = false;
@@ -56,6 +58,8 @@ export const useAuthStore = defineStore('auth', {
 
         setProfilePhoto(photo) {
             this.profilePhoto = photo;
+            if (photo) localStorage.setItem('profilePhoto', photo);
+            else localStorage.removeItem('profilePhoto');
         }
     }
 });
