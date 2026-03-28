@@ -44,9 +44,6 @@ const login = async () => {
 
     localStorage.setItem("token", token)
 
-    axios.defaults.headers.common["Authorization"] =
-      `Bearer ${token}`
-
     const auth = useAuthStore()
     //auth.loadSession()
 
