@@ -7,7 +7,7 @@ import GoogleWidget from '@/components/auth/GoogleWidget.vue'
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
-import axios from 'axios'
+import api from '@/service/api'
 
 import { useAuthStore } from '@/stores/authStore'
 
@@ -34,7 +34,7 @@ const login = async () => {
 
   try {
 
-    const response = await axios.post('/api/auth/login', {
+    const response = await api.post('/auth/login', {
       username: username.value,
       password: password.value
     })
