@@ -23,6 +23,7 @@ const loadingEmail = ref(false)
 
 // Photo
 const photoPreview = ref(null)
+const selectedFile = ref(null)
 const loadingPhoto = ref(false)
 const fileInput = ref(null)
 
@@ -108,24 +109,29 @@ const onFileSelected = (event) => {
     return
   }
 
+  selectedFile.value = file
   const reader = new FileReader()
-  reader.onload = (e) => {
-    photoPreview.value = e.target.result
-  }
+  reader.onload = (e) => { photoPreview.value = e.target.result }
   reader.readAsDataURL(file)
 }
 
 const uploadPhoto = async () => {
-  if (!photoPreview.value || photoPreview.value === profile.value.profilePhoto) {
+  if (!selectedFile.value) {
     toast.add({ severity: 'warn', summary: 'Warning', detail: 'Please select an image first', life: 3000 })
     return
   }
 
+  const formData = new FormData()
+  formData.append('photo', selectedFile.value)
+
   loadingPhoto.value = true
   try {
-    await api.put('/profile/photo', { photoBase64: photoPreview.value })
-    profile.value.profilePhoto = photoPreview.value
-    auth.setProfilePhoto(photoPreview.value)
+    const res = await api.put('/profile/photo', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+    profile.value.profilePhoto = res.data.profilePhoto
+    auth.setProfilePhoto(res.data.profilePhoto)
+    selectedFile.value = null
     toast.add({ severity: 'success', summary: 'Success', detail: 'Profile photo updated', life: 3000 })
   } catch {
     toast.add({ severity: 'error', summary: 'Error', detail: 'Error uploading photo', life: 3000 })

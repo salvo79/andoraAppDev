@@ -53,6 +53,7 @@ builder.Services.AddTransient<IResend, ResendClient>();
 builder.Services.AddTransient<anDora.Api.Services.EmailService>(); // ← solo aquí, sin duplicado
 
 builder.Services.AddAuthorization();
+builder.Services.AddSingleton<anDora.Api.Services.GcsService>();
 
 builder.Services.AddCors(options =>
 {
