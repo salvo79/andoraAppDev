@@ -6,7 +6,7 @@ import { ref } from 'vue';
 import AppBreadcrumb from './AppBreadcrumb.vue';
 const router = useRouter();
 const auth = useAuthStore();
-const { layoutState, isDarkTheme, toggleMenu, toggleConfigSidebar } = useLayout();
+const { layoutState, toggleMenu, toggleConfigSidebar } = useLayout();
 const baseUrl = import.meta.env.BASE_URL;
 
 
@@ -227,7 +227,7 @@ function showRightMenu() {
                             <li>
                                 <a @click="router.push('/profile')" class="label-small dark:text-surface-400 flex gap-2 py-2 px-2.5 rounded-lg items-center hover:bg-emphasis cursor-pointer">
                                     <i class="pi pi-user" />
-                                    <span>Mi Perfil</span>
+                                    <span>My Profile</span>
                                 </a>
                             </li>
                             <li>

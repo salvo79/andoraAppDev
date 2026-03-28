@@ -37,7 +37,7 @@ onMounted(async () => {
     newEmail.value = res.data.email
     if (res.data.profilePhoto) auth.setProfilePhoto(res.data.profilePhoto)
   } catch {
-    toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo cargar el perfil', life: 3000 })
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Could not load profile', life: 3000 })
   } finally {
     loadingProfile.value = false
   }
@@ -48,11 +48,11 @@ onMounted(async () => {
 ================================ */
 const changePassword = async () => {
   if (newPassword.value !== confirmPassword.value) {
-    toast.add({ severity: 'warn', summary: 'Atención', detail: 'Las contraseñas no coinciden', life: 3000 })
+    toast.add({ severity: 'warn', summary: 'Warning', detail: 'Passwords do not match', life: 3000 })
     return
   }
   if (newPassword.value.length < 6) {
-    toast.add({ severity: 'warn', summary: 'Atención', detail: 'La contraseña debe tener al menos 6 caracteres', life: 3000 })
+    toast.add({ severity: 'warn', summary: 'Warning', detail: 'Password must be at least 6 characters', life: 3000 })
     return
   }
 
@@ -62,12 +62,12 @@ const changePassword = async () => {
       currentPassword: currentPassword.value,
       newPassword: newPassword.value
     })
-    toast.add({ severity: 'success', summary: 'Listo', detail: 'Contraseña actualizada', life: 3000 })
+    toast.add({ severity: 'success', summary: 'Success', detail: 'Password updated', life: 3000 })
     currentPassword.value = ''
     newPassword.value = ''
     confirmPassword.value = ''
   } catch (err) {
-    const msg = err.response?.data?.message || 'Error al cambiar la contraseña'
+    const msg = err.response?.data?.message || 'Error updating password'
     toast.add({ severity: 'error', summary: 'Error', detail: msg, life: 3000 })
   } finally {
     loadingPassword.value = false
@@ -79,7 +79,7 @@ const changePassword = async () => {
 ================================ */
 const changeEmail = async () => {
   if (!newEmail.value || !newEmail.value.includes('@')) {
-    toast.add({ severity: 'warn', summary: 'Atención', detail: 'Ingresa un correo válido', life: 3000 })
+    toast.add({ severity: 'warn', summary: 'Warning', detail: 'Please enter a valid email', life: 3000 })
     return
   }
 
@@ -87,9 +87,9 @@ const changeEmail = async () => {
   try {
     await api.put('/profile/email', { newEmail: newEmail.value })
     profile.value.email = newEmail.value
-    toast.add({ severity: 'success', summary: 'Listo', detail: 'Correo actualizado', life: 3000 })
+    toast.add({ severity: 'success', summary: 'Success', detail: 'Email updated', life: 3000 })
   } catch (err) {
-    const msg = err.response?.data?.message || 'Error al cambiar el correo'
+    const msg = err.response?.data?.message || 'Error updating email'
     toast.add({ severity: 'error', summary: 'Error', detail: msg, life: 3000 })
   } finally {
     loadingEmail.value = false
@@ -104,7 +104,7 @@ const onFileSelected = (event) => {
   if (!file) return
 
   if (file.size > 2 * 1024 * 1024) {
-    toast.add({ severity: 'warn', summary: 'Atención', detail: 'La imagen no puede superar 2MB', life: 3000 })
+    toast.add({ severity: 'warn', summary: 'Warning', detail: 'Image must not exceed 2MB', life: 3000 })
     return
   }
 
@@ -117,7 +117,7 @@ const onFileSelected = (event) => {
 
 const uploadPhoto = async () => {
   if (!photoPreview.value || photoPreview.value === profile.value.profilePhoto) {
-    toast.add({ severity: 'warn', summary: 'Atención', detail: 'Selecciona una imagen primero', life: 3000 })
+    toast.add({ severity: 'warn', summary: 'Warning', detail: 'Please select an image first', life: 3000 })
     return
   }
 
@@ -126,9 +126,9 @@ const uploadPhoto = async () => {
     await api.put('/profile/photo', { photoBase64: photoPreview.value })
     profile.value.profilePhoto = photoPreview.value
     auth.setProfilePhoto(photoPreview.value)
-    toast.add({ severity: 'success', summary: 'Listo', detail: 'Foto actualizada', life: 3000 })
+    toast.add({ severity: 'success', summary: 'Success', detail: 'Profile photo updated', life: 3000 })
   } catch {
-    toast.add({ severity: 'error', summary: 'Error', detail: 'Error al subir la foto', life: 3000 })
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Error uploading photo', life: 3000 })
   } finally {
     loadingPhoto.value = false
   }
@@ -138,7 +138,7 @@ const uploadPhoto = async () => {
 <template>
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 p-6">
 
-  <!-- ===== FOTO Y DATOS ===== -->
+  <!-- ===== PHOTO & INFO ===== -->
   <div class="lg:col-span-1">
     <div class="card flex flex-col items-center gap-4 p-6">
 
@@ -147,7 +147,7 @@ const uploadPhoto = async () => {
         <img
           v-if="photoPreview"
           :src="photoPreview"
-          alt="Foto de perfil"
+          alt="Profile photo"
           class="w-32 h-32 rounded-full object-cover border-4 border-primary shadow"
         />
         <div
@@ -174,14 +174,14 @@ const uploadPhoto = async () => {
       />
 
       <Button
-        label="Guardar foto"
+        label="Save photo"
         icon="pi pi-upload"
         size="small"
         :loading="loadingPhoto"
         @click="uploadPhoto"
       />
 
-      <!-- Info básica -->
+      <!-- Basic info -->
       <div class="text-center mt-2">
         <p class="text-xl font-semibold text-surface-900 dark:text-surface-0">{{ profile.username }}</p>
         <p class="text-surface-500 dark:text-white/60 text-sm">{{ profile.email }}</p>
@@ -189,26 +189,26 @@ const uploadPhoto = async () => {
           <Tag v-for="role in profile.roles" :key="role" :value="role" severity="info" />
         </div>
         <p class="text-xs text-surface-400 mt-3">
-          Miembro desde {{ profile.createdAt ? new Date(profile.createdAt).toLocaleDateString() : '-' }}
+          Member since {{ profile.createdAt ? new Date(profile.createdAt).toLocaleDateString() : '-' }}
         </p>
       </div>
 
     </div>
   </div>
 
-  <!-- ===== FORMULARIOS ===== -->
+  <!-- ===== FORMS ===== -->
   <div class="lg:col-span-2 flex flex-col gap-6">
 
-    <!-- Cambiar email -->
+    <!-- Change email -->
     <div class="card p-6">
-      <h3 class="text-lg font-semibold mb-4">Correo electrónico</h3>
+      <h3 class="text-lg font-semibold mb-4">Email address</h3>
       <div class="flex flex-col gap-4">
         <div class="flex flex-col gap-2">
-          <label class="font-medium text-surface-500 dark:text-white/64">Nuevo correo</label>
-          <InputText v-model="newEmail" placeholder="correo@ejemplo.com" class="w-full" />
+          <label class="font-medium text-surface-500 dark:text-white/64">New email</label>
+          <InputText v-model="newEmail" placeholder="email@example.com" class="w-full" />
         </div>
         <Button
-          label="Actualizar correo"
+          label="Update email"
           icon="pi pi-envelope"
           :loading="loadingEmail"
           @click="changeEmail"
@@ -216,24 +216,24 @@ const uploadPhoto = async () => {
       </div>
     </div>
 
-    <!-- Cambiar contraseña -->
+    <!-- Change password -->
     <div class="card p-6">
-      <h3 class="text-lg font-semibold mb-4">Cambiar contraseña</h3>
+      <h3 class="text-lg font-semibold mb-4">Change password</h3>
       <div class="flex flex-col gap-4">
         <div class="flex flex-col gap-2">
-          <label class="font-medium text-surface-500 dark:text-white/64">Contraseña actual</label>
+          <label class="font-medium text-surface-500 dark:text-white/64">Current password</label>
           <Password v-model="currentPassword" toggleMask :feedback="false" class="w-full" inputClass="w-full" />
         </div>
         <div class="flex flex-col gap-2">
-          <label class="font-medium text-surface-500 dark:text-white/64">Nueva contraseña</label>
+          <label class="font-medium text-surface-500 dark:text-white/64">New password</label>
           <Password v-model="newPassword" toggleMask :feedback="true" class="w-full" inputClass="w-full" />
         </div>
         <div class="flex flex-col gap-2">
-          <label class="font-medium text-surface-500 dark:text-white/64">Confirmar nueva contraseña</label>
+          <label class="font-medium text-surface-500 dark:text-white/64">Confirm new password</label>
           <Password v-model="confirmPassword" toggleMask :feedback="false" class="w-full" inputClass="w-full" />
         </div>
         <Button
-          label="Cambiar contraseña"
+          label="Change password"
           icon="pi pi-lock"
           :loading="loadingPassword"
           @click="changePassword"
