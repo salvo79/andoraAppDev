@@ -7,7 +7,8 @@ export const useAuthStore = defineStore('auth', {
     state: () => ({
         user: null,
         roles: [],
-        isAuthenticated: false
+        isAuthenticated: false,
+        profilePhoto: null
     }),
 
     actions: {
@@ -33,16 +34,28 @@ export const useAuthStore = defineStore('auth', {
             this.user = null;
             this.roles = [];
             this.isAuthenticated = false;
+            this.profilePhoto = null;
+            localStorage.removeItem('token');
         },
-        // ✅ Nueva función para cargar sesión desde localStorage
+
         loadSession() {
-        const stored = localStorage.getItem('auth');
-        if (stored) {
-            const data = JSON.parse(stored);
-            this.user = data.user;
-            this.roles = data.roles;
-            this.isAuthenticated = true;
+            const token = localStorage.getItem('token');
+            if (token) {
+                try {
+                    const payload = JSON.parse(atob(token.split('.')[1]));
+                    const username = payload['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name'];
+                    if (username) {
+                        this.user = username;
+                        this.isAuthenticated = true;
+                    }
+                } catch {
+                    this.isAuthenticated = false;
+                }
             }
+        },
+
+        setProfilePhoto(photo) {
+            this.profilePhoto = photo;
         }
     }
 });

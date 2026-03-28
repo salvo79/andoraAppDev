@@ -50,6 +50,9 @@ namespace anDora.Api.Models
         public string? EmailVerificationToken { get; set; }
 
         [BsonElement("emailVerificationExpires")]
-public DateTime? EmailVerificationExpires { get; set; }
+        public DateTime? EmailVerificationExpires { get; set; }
+
+        [BsonElement("profilePhoto")]
+        public string? ProfilePhoto { get; set; }
     }
 }

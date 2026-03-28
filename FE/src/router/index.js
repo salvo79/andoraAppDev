@@ -423,6 +423,14 @@ const routes = [
                 path: '/pages/invoice',
                 name: 'invoice',
                 component: () => import('@/views/pages/Invoice.vue')
+            },
+            {
+                path: '/profile',
+                name: 'profile',
+                meta: {
+                    breadcrumb: ['Mi Perfil']
+                },
+                component: () => import('@/views/user/ProfileView.vue')
             }
         ]
     },

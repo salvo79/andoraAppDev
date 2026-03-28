@@ -211,16 +211,23 @@ function showRightMenu() {
                         class="bg-none! border-none! outline-none!"
                         v-styleclass="{ selector: '@next', enterFromClass: 'hidden', enterActiveClass: 'p-anchored-overlay-enter-active', leaveActiveClass: 'p-anchored-overlay-leave-active', leaveToClass: 'hidden', hideOnOutsideClick: true }"
                     >
-                        <Avatar image="/layout/images/profile.jpg" pt:image:class="rounded-lg!" class="w-10! h-10!" />
+                        <Avatar
+                            :image="auth.profilePhoto || '/layout/images/profile.jpg'"
+                            pt:image:class="rounded-lg! object-cover"
+                            class="w-10! h-10!"
+                        />
                     </a>
                     <div
                         class="list-none p-2 m-0 rounded-2xl border border-surface overflow-hidden absolute bg-surface-0 dark:bg-surface-900 hidden origin-top w-52 mt-2 right-0 z-[999] top-auto shadow-[0px_56px_16px_0px_rgba(0,0,0,0.00),0px_36px_14px_0px_rgba(0,0,0,0.01),0px_20px_12px_0px_rgba(0,0,0,0.02),0px_9px_9px_0px_rgba(0,0,0,0.03),0px_2px_5px_0px_rgba(0,0,0,0.04)]"
                     >
+                        <div class="px-2.5 py-2 mb-1 border-b border-surface">
+                            <p class="font-semibold text-surface-900 dark:text-surface-0 text-sm">{{ auth.user }}</p>
+                        </div>
                         <ul class="flex flex-col gap-1">
                             <li>
-                                <a class="label-small dark:text-surface-400 flex gap-2 py-2 px-2.5 rounded-lg items-center hover:bg-emphasis cursor-pointer">
+                                <a @click="router.push('/profile')" class="label-small dark:text-surface-400 flex gap-2 py-2 px-2.5 rounded-lg items-center hover:bg-emphasis cursor-pointer">
                                     <i class="pi pi-user" />
-                                    <span>Profile</span>
+                                    <span>Mi Perfil</span>
                                 </a>
                             </li>
                             <li>
