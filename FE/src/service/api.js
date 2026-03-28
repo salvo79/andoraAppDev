@@ -3,7 +3,9 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "/api",
+  baseURL: import.meta.env.PROD
+    ? 'https://andora-app-843120821405.us-central1.run.app/api'
+    : '/api',
   headers: {
     "Content-Type": "application/json"
   },
