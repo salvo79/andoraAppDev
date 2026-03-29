@@ -1,1 +1,0 @@
-import{o as a,b as e,e as o}from"./index-CHYLfzHD.js";const n=["src"],l={__name:"AuthLogoWidget",setup(r){const s="/landing/";return(t,c)=>(a(),e("img",{src:`${o(s)}andora.svg`,alt:"anDora",class:"h-52"},null,8,n))}};export{l as _};
