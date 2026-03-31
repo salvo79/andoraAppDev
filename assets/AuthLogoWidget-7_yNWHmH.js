@@ -1,0 +1,1 @@
+import{o as e,b as o,e as a}from"./index-CRjgJx4W.js";const r=["src"],l={__name:"AuthLogoWidget",setup(t){const s="/";return(c,n)=>(e(),o("img",{src:`${a(s)}andora.svg`,alt:"anDora",class:"h-52"},null,8,r))}};export{l as _};
