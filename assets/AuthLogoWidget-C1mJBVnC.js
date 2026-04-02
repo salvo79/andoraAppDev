@@ -1,1 +1,0 @@
-import{o as e,b as o,e as s}from"./index-DvUEC9IE.js";const r=["src"],l={__name:"AuthLogoWidget",setup(t){const a="/andoraAppDev/";return(n,c)=>(e(),o("img",{src:`${s(a)}andora.svg`,alt:"anDora",class:"h-52"},null,8,r))}};export{l as _};
