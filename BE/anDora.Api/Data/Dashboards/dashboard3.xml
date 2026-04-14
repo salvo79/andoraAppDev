@@ -1,0 +1,12 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Dashboard RequestParameters="false">
+  <Title Text="Hola" />
+  <DataSources>
+    <MongoDBDataSource Name="Precios Reales" ConnectionName="andoraDB" ComponentName="mongoDBDataSource1">
+      <Parameters ConnectionString="mongodb+srv://andoraDb_admin:S07d05l79r55@andoradb.jk7odiq.mongodb.net/?appName=andoraDb" />
+      <Queries>
+        <Query DatabaseName="andoraDB" CollectionName="resumen_precios_reales" Alias="Precios" />
+      </Queries>
+    </MongoDBDataSource>
+  </DataSources>
+</Dashboard>

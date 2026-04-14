@@ -1,14 +1,13 @@
 <template>
 <div>
-
     <!-- Contenedor superior (botón + selector) -->
     <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
-        <DxButton 
-            @click="switchWorkingMode" 
+        <DxButton
+            @click="switchWorkingMode"
             :text="buttonText"
-        />   
+        />
 
-        <DxSelectBox            
+        <DxSelectBox
             :data-source="data"
             v-model:value="dashboardIdProp"
             display-expr="name"
@@ -17,15 +16,15 @@
         />
     </div>
 
-    <!-- Dashboard abajo -->
-    <DxDashboardControl 
+    <!-- Dashboard -->
+    <DxDashboardControl
         style="height:900px; display:block; width:100%;"
-        endpoint="http://localhost:5000/api/dashboard"
+        endpoint="/api/dashboard"
         :workingMode="workingModeProp"
         :dashboardId="dashboardIdProp"
         @beforeRender="onBeforeRender"
     />
-    
+
 </div>
 </template>
 
@@ -34,7 +33,7 @@ import DxButton from 'devextreme-vue/button';
 import DxSelectBox from 'devextreme-vue/select-box';
 import ArrayStore from 'devextreme/data/array_store';
 import { DxDashboardControl } from 'devexpress-dashboard-vue';
-import {TextBoxItemEditorExtension} from 'devexpress-dashboard/designer/text-box-item-editor-extension';
+import { TextBoxItemEditorExtension } from 'devexpress-dashboard/designer/text-box-item-editor-extension';
 
 export default {
     components: {
@@ -42,14 +41,11 @@ export default {
         DxButton,
         DxSelectBox
     },
-    data: function() {
-        const dashboards = [
-            {"id": "support", "name": "Support"},
-            {"id": "products", "name": "Products"},
-        ];
+    data() {
+        const dashboards = [];  // Se cargan desde el backend (DashboardFileStorage)
         return {
-            dashboardIdProp: dashboards[0].id,
-            workingModeProp: "Designer",            
+            dashboardIdProp: null,
+            workingModeProp: 'Designer',
             data: new ArrayStore({
                 data: dashboards,
                 key: 'id'
@@ -58,16 +54,26 @@ export default {
     },
     methods: {
         switchWorkingMode() {
-            this.workingModeProp =  this.workingModeProp === "Designer" ? "Viewer": "Designer"            
+            this.workingModeProp = this.workingModeProp === 'Designer' ? 'Viewer' : 'Designer';
         },
         onBeforeRender(e) {
             e.component.registerExtension(new TextBoxItemEditorExtension(e.component));
+
+            // Inyecta el JWT en cada petición que hace el control al backend
+            const token = localStorage.getItem('token');
+            if (token) {
+                e.component.option('ajaxRemoteService', {
+                    headers: {
+                        Authorization: `Bearer ${token}`
+                    }
+                });
+            }
         }
     },
     computed: {
-      buttonText() {
-        return `Switch to ${this.workingModeProp === "Designer" ? "Viewer": "Designer"}`; 
-      }
+        buttonText() {
+            return `Switch to ${this.workingModeProp === 'Designer' ? 'Viewer' : 'Designer'}`;
+        }
     }
 }
 </script>
