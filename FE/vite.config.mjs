@@ -10,14 +10,14 @@ import { defineConfig } from 'vite';
 // https://vitejs.dev/config/
 export default defineConfig({
     optimizeDeps: {
-        noDiscovery: true,
-        include: ['quill',
-                  'knockout',
-                  'devexpress-dashboard',
-                  'devexpress-dashboard-vue',
-                  '@devexpress/analytics-core',
-                  'devexpress-dashboard/designer/text-box-item-editor-extension'
-                ]
+        include: [
+            'quill',
+            'knockout',
+            'devexpress-dashboard',
+            'devexpress-dashboard-vue',
+            '@devexpress/analytics-core',
+            'devexpress-dashboard/designer/text-box-item-editor-extension'
+        ]
     },
     base: process.env.DEPLOY_TARGET === 'gh-pages' ? '/andoraAppDev/' : '/',
     plugins: [

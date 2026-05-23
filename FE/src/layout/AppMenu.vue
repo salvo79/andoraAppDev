@@ -9,460 +9,179 @@ const model = ref([
         path: '/dashboard',
         items: [
             {
-                label: 'Marketing',
-                icon: 'pi pi-fw pi-gauge',
-                to: '/dashboard/marketing'
-            },
-            {
-                label: 'E-Commerce',
-                icon: 'pi pi-fw pi-warehouse',
-                to: '/dashboard/e-commerce'
+                label: 'Operaciones',
+                icon: 'pi pi-fw pi-chart-bar',
+                to: '/dashboard/operations'
             },
             {
                 label: 'DevExpress Dashboard',
-                icon: 'pi pi-chart-line',
+                icon: 'pi pi-fw pi-objects-column',
                 to: '/dashboard'
-            },          
-            {
-                label: 'Banking',
-                icon: 'pi pi-fw pi-building-columns',
-                to: '/dashboard/banking'
             }
         ]
     },
     { separator: true },
     {
-        label: 'Apps',
-        icon: 'pi pi-th-large',
-        path: '/apps',
+        label: 'Seguimiento Operativo',
+        icon: 'pi pi-wave-pulse',
+        path: '/seguimiento',
         items: [
             {
-                label: 'CMS',
-                icon: 'pi pi-fw pi-comment',
-                path: '/cms',
-                items: [
-                    {
-                        label: 'Detail',
-                        icon: 'pi pi-fw pi-list',
-                        to: '/apps/cms/detail'
-                    },
-                    {
-                        label: 'Detail-2',
-                        icon: 'pi pi-fw pi-list',
-                        to: '/apps/cms/detail2'
-                    },
-                    {
-                        label: 'List',
-                        icon: 'pi pi-fw pi-image',
-                        to: '/apps/cms/list'
-                    },
-                    {
-                        label: 'Edit',
-                        icon: 'pi pi-fw pi-pencil',
-                        to: '/apps/cms/edit'
-                    }
-                ]
-            },
-            {
-                label: 'Chat',
-                icon: 'pi pi-fw pi-comments',
-                to: '/apps/chat'
-            },
-            {
-                label: 'Files',
-                icon: 'pi pi-fw pi-folder',
-                to: '/apps/files'
-            },
-            {
-                label: 'Mail',
-                icon: 'pi pi-fw pi-envelope',
-                to: '/apps/mail/inbox'
-            },
-            {
-                label: 'Task List',
-                icon: 'pi pi-fw pi-check-square',
-                to: '/apps/tasklist'
+                label: 'Historiador',
+                icon: 'pi pi-fw pi-chart-line',
+                to: '/seguimiento'
             }
         ]
     },
     { separator: true },
     {
-        label: 'UI Kit',
-        icon: 'pi pi-fw pi-star-fill',
-        path: '/uikit',
+        label: 'Programación Operativa',
+        icon: 'pi pi-calendar',
+        path: '/programacion',
         items: [
             {
-                label: 'Form Layout',
-                icon: 'pi pi-fw pi-id-card',
-                to: '/uikit/formlayout'
+                label: 'Resumen',
+                icon: 'pi pi-fw pi-th-large',
+                to: '/programacion'
             },
             {
-                label: 'Input',
-                icon: 'pi pi-fw pi-check-square',
-                to: '/uikit/input'
+                label: 'Plan de Producción',
+                icon: 'pi pi-fw pi-calendar-plus',
+                to: '/programacion/plan-produccion'
             },
             {
-                label: 'Button',
-                icon: 'pi pi-fw pi-box',
-                to: '/uikit/button'
+                label: 'Órdenes de Trabajo',
+                icon: 'pi pi-fw pi-file-edit',
+                to: '/programacion/ordenes-trabajo'
             },
             {
-                label: 'Table',
-                icon: 'pi pi-fw pi-table',
-                to: '/uikit/table'
+                label: 'Programa de Turnos',
+                icon: 'pi pi-fw pi-users',
+                to: '/programacion/turnos'
             },
             {
-                label: 'List',
-                icon: 'pi pi-fw pi-list',
-                to: '/uikit/list'
+                label: 'Mantenimiento',
+                icon: 'pi pi-fw pi-wrench',
+                to: '/programacion/mantenimiento'
             },
             {
-                label: 'Tree',
-                icon: 'pi pi-fw pi-share-alt',
-                to: '/uikit/tree'
+                label: 'Despacho',
+                icon: 'pi pi-fw pi-truck',
+                to: '/programacion/despacho'
             },
             {
-                label: 'Panel',
-                icon: 'pi pi-fw pi-tablet',
-                to: '/uikit/panel'
+                label: 'Balance de Materiales',
+                icon: 'pi pi-fw pi-arrows-h',
+                to: '/programacion/balance'
+            }
+        ]
+    },
+    { separator: true },
+    {
+        label: 'Optimización y Modelado',
+        icon: 'pi pi-sliders-h',
+        path: '/optimizacion',
+        items: [
+            {
+                label: 'Resumen',
+                icon: 'pi pi-fw pi-th-large',
+                to: '/optimizacion'
             },
             {
-                label: 'Overlay',
-                icon: 'pi pi-fw pi-clone',
-                to: '/uikit/overlay'
+                label: 'Modelos de Proceso',
+                icon: 'pi pi-fw pi-sitemap',
+                to: '/optimizacion/modelos-proceso'
             },
             {
-                label: 'Media',
-                icon: 'pi pi-fw pi-image',
-                to: '/uikit/media'
+                label: 'Optimización de Mezclas',
+                icon: 'pi pi-fw pi-sliders-h',
+                to: '/optimizacion/mezclas'
             },
             {
-                label: 'Menu',
-                icon: 'pi pi-fw pi-bars',
-                to: '/uikit/menu'
-            },
-            {
-                label: 'Message',
-                icon: 'pi pi-fw pi-comment',
-                to: '/uikit/message'
-            },
-            {
-                label: 'File',
-                icon: 'pi pi-fw pi-file',
-                to: '/uikit/file'
-            },
-            {
-                label: 'Chart',
+                label: 'LP de Planeación',
                 icon: 'pi pi-fw pi-chart-bar',
-                to: '/uikit/charts'
+                to: '/optimizacion/lp-planning'
             },
             {
-                label: 'Timeline',
-                icon: 'pi pi-fw pi-calendar',
-                to: '/uikit/timeline'
+                label: 'Análisis What-If',
+                icon: 'pi pi-fw pi-objects-column',
+                to: '/optimizacion/what-if'
             },
             {
-                label: 'Misc',
-                icon: 'pi pi-fw pi-circle-off',
-                to: '/uikit/misc'
+                label: 'Optimización de Rutas',
+                icon: 'pi pi-fw pi-directions',
+                to: '/optimizacion/rutas'
+            },
+            {
+                label: 'Benchmarking',
+                icon: 'pi pi-fw pi-gauge',
+                to: '/optimizacion/benchmarking'
+            },
+            {
+                label: 'Gemelo Digital',
+                icon: 'pi pi-fw pi-sync',
+                to: '/optimizacion/digital-twin'
             }
         ]
     },
     { separator: true },
     {
-        label: 'Prime Blocks',
-        icon: 'pi pi-fw pi-prime',
-        path: '/blocks',
+        label: 'Administración',
+        icon: 'pi pi-cog',
+        path: '/admin',
         items: [
             {
-                label: 'Free Blocks',
-                icon: 'pi pi-fw pi-eye',
-                to: '/blocks/free'
+                label: 'Catálogos',
+                icon: 'pi pi-fw pi-th-large',
+                to: '/admin'
             },
             {
-                label: 'All Blocks',
-                icon: 'pi pi-fw pi-globe',
-                url: 'https://primeblocks.org',
-                target: '_blank'
+                label: 'Sitios',
+                icon: 'pi pi-fw pi-map-marker',
+                to: '/admin/sitios'
+            },
+            {
+                label: 'Plantas',
+                icon: 'pi pi-fw pi-building',
+                to: '/admin/plantas'
+            },
+            {
+                label: 'Trabajadores',
+                icon: 'pi pi-fw pi-users',
+                to: '/admin/trabajadores'
+            },
+            {
+                label: 'Proveedores',
+                icon: 'pi pi-fw pi-truck',
+                to: '/admin/proveedores'
+            },
+            {
+                label: 'Tanques',
+                icon: 'pi pi-fw pi-database',
+                to: '/admin/tanques'
+            },
+            {
+                label: 'Rutas',
+                icon: 'pi pi-fw pi-directions',
+                to: '/admin/rutas'
+            },
+            {
+                label: 'Productos',
+                icon: 'pi pi-fw pi-box',
+                to: '/admin/productos'
+            },
+            {
+                label: 'Corrientes',
+                icon: 'pi pi-fw pi-arrow-right-arrow-left',
+                to: '/admin/corrientes'
+            },
+            {
+                label: 'Precios',
+                icon: 'pi pi-fw pi-tag',
+                to: '/admin/precios'
             }
         ]
     },
-    { separator: true },
-    {
-        label: 'Utilities',
-        icon: 'pi pi-fw pi-compass',
-        path: '/utilities',
-        items: [
-            {
-                label: 'Figma',
-                icon: 'pi pi-fw pi-pencil',
-                url: 'https://www.figma.com/design/eMNbyxsMp3H0PQbMyyGK77/Preview-%7C-Poseidon?node-id=0-1&t=wJRSplRnKvjqju9S-1',
-                target: '_blank'
-            }
-        ]
-    },
-    { separator: true },
-    {
-        label: 'Pages',
-        icon: 'pi pi-fw pi-briefcase',
-        path: '/pages',
-        items: [
-            {
-                label: 'Landing',
-                icon: 'pi pi-fw pi-globe',
-                to: '/landing'
-            },
-            {
-                label: 'Auth',
-                icon: 'pi pi-fw pi-user',
-                path: '/auth',
-                items: [
-                    {
-                        label: 'Login',
-                        icon: 'pi pi-fw pi-sign-in',
-                        to: '/landing/login'
-                    },
-                    {
-                        label: 'Error',
-                        icon: 'pi pi-fw pi-times-circle',
-                        to: '/landing/error'
-                    },
-                    {
-                        label: 'Access Denied',
-                        icon: 'pi pi-fw pi-lock',
-                        to: '/landing/access'
-                    },
-                    {
-                        label: 'Register',
-                        icon: 'pi pi-fw pi-user-plus',
-                        to: '/landing/register'
-                    },
-                    {
-                        label: 'Forgot Password',
-                        icon: 'pi pi-fw pi-question',
-                        to: '/landing/forgot-password'
-                    },
-                    {
-                        label: 'New Password',
-                        icon: 'pi pi-fw pi-cog',
-                        to: '/landing/new-password'
-                    },
-                    {
-                        label: 'Verification',
-                        icon: 'pi pi-fw pi-envelope',
-                        to: '/landing/verification'
-                    },
-                    {
-                        label: 'Lock Screen',
-                        icon: 'pi pi-fw pi-eye-slash',
-                        to: '/landing/lock-screen'
-                    }
-                ]
-            },
-            {
-                label: 'Crud',
-                icon: 'pi pi-fw pi-pencil',
-                to: '/pages/crud'
-            },
-            {
-                label: 'Invoice',
-                icon: 'pi pi-fw pi-dollar',
-                to: '/pages/invoice'
-            },
-            {
-                label: 'About Us',
-                icon: 'pi pi-fw pi-user',
-                to: '/pages/aboutus'
-            },
-            {
-                label: 'Help',
-                icon: 'pi pi-fw pi-question-circle',
-                to: '/pages/help'
-            },
-            {
-                label: 'Oops',
-                icon: 'pi pi-fw pi-exclamation-circle',
-                to: '/landing/oops'
-            },
-            {
-                label: 'Not Found',
-                icon: 'pi pi-fw pi-exclamation-circle',
-                to: '/pages/notfound'
-            },
-            {
-                label: 'Empty',
-                icon: 'pi pi-fw pi-circle-off',
-                to: '/pages/empty'
-            },
-            {
-                label: 'FAQ',
-                icon: 'pi pi-fw pi-question',
-                to: '/pages/faq'
-            },
-            {
-                label: 'Contact Us',
-                icon: 'pi pi-fw pi-phone',
-                to: '/landing/contact'
-            }
-        ]
-    },
-    { separator: true },
-    {
-        label: 'E-Commerce',
-        icon: 'pi pi-fw pi-wallet',
-        path: '/ecommerce',
-        items: [
-            {
-                label: 'Product Overview',
-                icon: 'pi pi-fw pi-image',
-                to: '/ecommerce/product-overview'
-            },
-            {
-                label: 'Product List',
-                icon: 'pi pi-fw pi-list',
-                to: '/ecommerce/product-list'
-            },
-            {
-                label: 'New Product',
-                icon: 'pi pi-fw pi-plus',
-                to: '/ecommerce/new-product'
-            },
-            {
-                label: 'Shopping Cart',
-                icon: 'pi pi-fw pi-shopping-cart',
-                to: '/ecommerce/shopping-cart'
-            },
-            {
-                label: 'Checkout Form',
-                icon: 'pi pi-fw pi-check-square',
-                to: '/ecommerce/checkout-form'
-            },
-            {
-                label: 'Order History',
-                icon: 'pi pi-fw pi-history',
-                to: '/ecommerce/order-history'
-            },
-            {
-                label: 'Order Summary',
-                icon: 'pi pi-fw pi-file',
-                to: '/ecommerce/order-summary'
-            }
-        ]
-    },
-    { separator: true },
-    {
-        label: 'User Management',
-        icon: 'pi pi-fw pi-user',
-        path: '/profile',
-        items: [
-            {
-                label: 'List',
-                icon: 'pi pi-fw pi-list',
-                to: '/profile/list'
-            },
-            {
-                label: 'Create',
-                icon: 'pi pi-fw pi-plus',
-                to: '/profile/create'
-            }
-        ]
-    },
-    { separator: true },
-    {
-        label: 'Hierarchy',
-        icon: 'pi pi-fw pi-align-left',
-        path: '/hierarchy',
-        items: [
-            {
-                label: 'Submenu 1',
-                icon: 'pi pi-fw pi-align-left',
-                path: '/submenu_1',
-                items: [
-                    {
-                        label: 'Submenu 1.1',
-                        icon: 'pi pi-fw pi-align-left',
-                        path: '/submenu_1_1',
-                        items: [
-                            {
-                                label: 'Submenu 1.1.1',
-                                icon: 'pi pi-fw pi-align-left'
-                            },
-                            {
-                                label: 'Submenu 1.1.2',
-                                icon: 'pi pi-fw pi-align-left'
-                            },
-                            {
-                                label: 'Submenu 1.1.3',
-                                icon: 'pi pi-fw pi-align-left'
-                            }
-                        ]
-                    },
-                    {
-                        label: 'Submenu 1.2',
-                        icon: 'pi pi-fw pi-align-left',
-                        path: '/submenu_1_2',
-                        items: [
-                            {
-                                label: 'Submenu 1.2.1',
-                                icon: 'pi pi-fw pi-align-left'
-                            }
-                        ]
-                    }
-                ]
-            },
-            {
-                label: 'Submenu 2',
-                icon: 'pi pi-fw pi-align-left',
-                path: '/submenu_2',
-                items: [
-                    {
-                        label: 'Submenu 2.1',
-                        icon: 'pi pi-fw pi-align-left',
-                        path: '/submenu_2_1',
-                        items: [
-                            {
-                                label: 'Submenu 2.1.1',
-                                icon: 'pi pi-fw pi-align-left'
-                            },
-                            {
-                                label: 'Submenu 2.1.2',
-                                icon: 'pi pi-fw pi-align-left'
-                            }
-                        ]
-                    },
-                    {
-                        label: 'Submenu 2.2',
-                        icon: 'pi pi-fw pi-align-left',
-                        path: '/submenu_2_2',
-                        items: [
-                            {
-                                label: 'Submenu 2.2.1',
-                                icon: 'pi pi-fw pi-align-left'
-                            }
-                        ]
-                    }
-                ]
-            }
-        ]
-    },
-    { separator: true },
-    {
-        label: 'Start',
-        icon: 'pi pi-fw pi-download',
-        path: '/start',
-        items: [
-            {
-                label: 'Buy Now',
-                icon: 'pi pi-fw pi-shopping-cart',
-                url: 'https://www.primefaces.org/store'
-            },
-            {
-                label: 'Documentation',
-                icon: 'pi pi-fw pi-info-circle',
-                to: '/start/documentation'
-            }
-        ]
-    }
 ]);
 </script>
 

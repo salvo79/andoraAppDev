@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  PLANTILLA — copiar a nuget.config y reemplazar YOUR_DEVEXPRESS_API_KEY.
+  nuget.config está en .gitignore; este archivo es seguro para commitear.
+
+  1. Obtén tu clave en: https://www.devexpress.com/MyAccount/NuGet/
+  2. cp nuget.config.example nuget.config
+  3. Reemplaza YOUR_DEVEXPRESS_API_KEY en nuget.config
+  4. dotnet restore
+-->
+<configuration>
+  <packageSources>
+    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" protocolVersion="3" />
+    <add key="DevExpress" value="https://nuget.devexpress.com/YOUR_DEVEXPRESS_API_KEY/api" />
+  </packageSources>
+</configuration>

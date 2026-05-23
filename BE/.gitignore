@@ -1,3 +1,6 @@
+# NuGet con API key de DevExpress — NUNCA commitear (la clave va en el URL)
+nuget.config
+
 # Secretos de producción - NUNCA commitear
 **/appsettings.Production.json
 **/appsettings.Development.json

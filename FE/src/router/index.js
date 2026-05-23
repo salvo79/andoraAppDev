@@ -57,6 +57,98 @@ const routes = [
                 component: () => import('@/views/dashboard/BankingView.vue')
             },
             {
+                path: '/dashboard/operations',
+                name: 'dashboard-operations',
+                meta: { breadcrumb: ['Dashboard Operaciones'] },
+                component: () => import('@/views/dashboard/OperationsView.vue')
+            },
+
+            // ── Seguimiento Operativo ────────────────────────────────────────
+            {
+                path: '/seguimiento',
+                name: 'seguimiento',
+                meta: { breadcrumb: ['Seguimiento Operativo'] },
+                component: () => import('@/views/seguimiento/HistoriadorView.vue')
+            },
+
+            // ── Programación Operativa ───────────────────────────────────────
+            {
+                path: '/programacion',
+                name: 'programacion',
+                meta: { breadcrumb: ['Programación Operativa'] },
+                component: () => import('@/views/programacion/ProgramacionView.vue')
+            },
+
+            // ── Optimización y Modelado ──────────────────────────────────────
+            {
+                path: '/optimizacion',
+                name: 'optimizacion',
+                meta: { breadcrumb: ['Optimización de Operaciones y Modelado'] },
+                component: () => import('@/views/optimizacion/OptimizacionView.vue')
+            },
+
+            // ── Administración / Catálogos ───────────────────────────────────
+            {
+                path: '/admin',
+                name: 'admin',
+                meta: { breadcrumb: ['Administración'] },
+                component: () => import('@/views/admin/AdminView.vue')
+            },
+            {
+                path: '/admin/sitios',
+                name: 'admin-sitios',
+                meta: { breadcrumb: ['Administración', 'Sitios'] },
+                component: () => import('@/views/admin/SitiosView.vue')
+            },
+            {
+                path: '/admin/plantas',
+                name: 'admin-plantas',
+                meta: { breadcrumb: ['Administración', 'Plantas'] },
+                component: () => import('@/views/admin/PlantasView.vue')
+            },
+            {
+                path: '/admin/trabajadores',
+                name: 'admin-trabajadores',
+                meta: { breadcrumb: ['Administración', 'Trabajadores'] },
+                component: () => import('@/views/admin/TrabajadoresView.vue')
+            },
+            {
+                path: '/admin/proveedores',
+                name: 'admin-proveedores',
+                meta: { breadcrumb: ['Administración', 'Proveedores'] },
+                component: () => import('@/views/admin/ProveedoresView.vue')
+            },
+            {
+                path: '/admin/tanques',
+                name: 'admin-tanques',
+                meta: { breadcrumb: ['Administración', 'Tanques'] },
+                component: () => import('@/views/admin/TanquesView.vue')
+            },
+            {
+                path: '/admin/rutas',
+                name: 'admin-rutas',
+                meta: { breadcrumb: ['Administración', 'Rutas'] },
+                component: () => import('@/views/admin/RutasView.vue')
+            },
+            {
+                path: '/admin/productos',
+                name: 'admin-productos',
+                meta: { breadcrumb: ['Administración', 'Productos'] },
+                component: () => import('@/views/admin/ProductosView.vue')
+            },
+            {
+                path: '/admin/corrientes',
+                name: 'admin-corrientes',
+                meta: { breadcrumb: ['Administración', 'Corrientes'] },
+                component: () => import('@/views/admin/CorrientesView.vue')
+            },
+            {
+                path: '/admin/precios',
+                name: 'admin-precios',
+                meta: { breadcrumb: ['Administración', 'Precios'] },
+                component: () => import('@/views/admin/PreciosAdminView.vue')
+            },
+            {
                 path: '/apps/cms/list',
                 meta: {
                     breadcrumb: ['CMS', 'List'],
