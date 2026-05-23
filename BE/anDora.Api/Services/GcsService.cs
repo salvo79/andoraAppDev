@@ -7,30 +7,38 @@ namespace anDora.Api.Services
 {
     public class GcsService
     {
-        private readonly StorageClient _storage;
+        private readonly StorageClient? _storage;
         private readonly string _bucketName;
 
         public GcsService(IConfiguration config)
         {
-            var credBase64 = Environment.GetEnvironmentVariable("GCS_CREDENTIALS_BASE64");
+            _bucketName = config["GcsSettings:BucketName"] ?? string.Empty;
 
-            if (!string.IsNullOrEmpty(credBase64))
+            try
             {
-                var credJson = Encoding.UTF8.GetString(Convert.FromBase64String(credBase64));
-                var credential = GoogleCredential.FromJson(credJson);
-                _storage = StorageClient.Create(credential);
+                var credBase64 = Environment.GetEnvironmentVariable("GCS_CREDENTIALS_BASE64");
+                if (!string.IsNullOrEmpty(credBase64))
+                {
+                    var credJson = Encoding.UTF8.GetString(Convert.FromBase64String(credBase64));
+                    _storage = StorageClient.Create(GoogleCredential.FromJson(credJson));
+                }
+                else
+                {
+                    _storage = StorageClient.Create();
+                }
             }
-            else
+            catch (Exception ex)
             {
-                // ADC: uses GOOGLE_APPLICATION_CREDENTIALS locally or attached SA on Cloud Run
-                _storage = StorageClient.Create();
+                Console.WriteLine($"[GcsService] WARNING: Could not initialize GCS client: {ex.Message}");
+                _storage = null;
             }
-
-            _bucketName = config["GcsSettings:BucketName"]!;
         }
 
         public async Task<string> UploadProfilePhotoAsync(string username, Stream imageStream, string contentType)
         {
+            if (_storage == null)
+                throw new InvalidOperationException("GCS client not initialized. Check credentials.");
+
             var extension = contentType switch
             {
                 "image/png"  => "png",
@@ -53,6 +61,8 @@ namespace anDora.Api.Services
 
         public async Task DeleteObjectAsync(string publicUrl)
         {
+            if (_storage == null) return;
+
             var prefix = $"https://storage.googleapis.com/{_bucketName}/";
             if (!publicUrl.StartsWith(prefix)) return;
 
