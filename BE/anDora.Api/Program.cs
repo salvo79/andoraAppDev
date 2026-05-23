@@ -7,6 +7,9 @@ using Resend;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Ensure WebRootPath is always set
+builder.Environment.WebRootPath = Path.Combine(builder.Environment.ContentRootPath, "wwwroot");
+
 // ===============================
 // SERVICES
 // ===============================
@@ -84,6 +87,12 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors("AllowFrontend");
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(
+        Path.Combine(app.Environment.ContentRootPath, "wwwroot")),
+    RequestPath = ""
+});
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();

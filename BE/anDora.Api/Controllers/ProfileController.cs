@@ -119,15 +119,12 @@ namespace anDora.Api.Controllers
             if (user == null)
                 return NotFound(new { message = "User not found" });
 
-            // Delete old photo from GCS if it exists
             if (!string.IsNullOrEmpty(user.ProfilePhoto))
                 await _gcs.DeleteObjectAsync(user.ProfilePhoto);
 
-            // Upload new photo to GCS
             using var stream = photo.OpenReadStream();
             var photoUrl = await _gcs.UploadProfilePhotoAsync(username!, stream, photo.ContentType);
 
-            // Save URL in MongoDB
             var update = Builders<User>.Update.Set(u => u.ProfilePhoto, photoUrl);
             await _context.Users.UpdateOneAsync(u => u.Id == user.Id, update);
 

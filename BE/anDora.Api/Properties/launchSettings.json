@@ -8,7 +8,8 @@
       "launchUrl": "swagger",
       "applicationUrl": "https://localhost:5236",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "GOOGLE_APPLICATION_CREDENTIALS": "/Users/Salvo79/secrets/andora-gcs-key.json"
       }
     },
     "https": {

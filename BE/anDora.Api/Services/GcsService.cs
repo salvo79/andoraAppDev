@@ -1,4 +1,6 @@
 // GcsService.cs
+using System.Text;
+using Google.Apis.Auth.OAuth2;
 using Google.Cloud.Storage.V1;
 
 namespace anDora.Api.Services
@@ -10,7 +12,20 @@ namespace anDora.Api.Services
 
         public GcsService(IConfiguration config)
         {
-            _storage = StorageClient.Create();
+            var credBase64 = Environment.GetEnvironmentVariable("GCS_CREDENTIALS_BASE64");
+
+            if (!string.IsNullOrEmpty(credBase64))
+            {
+                var credJson = Encoding.UTF8.GetString(Convert.FromBase64String(credBase64));
+                var credential = GoogleCredential.FromJson(credJson);
+                _storage = StorageClient.Create(credential);
+            }
+            else
+            {
+                // ADC: uses GOOGLE_APPLICATION_CREDENTIALS locally or attached SA on Cloud Run
+                _storage = StorageClient.Create();
+            }
+
             _bucketName = config["GcsSettings:BucketName"]!;
         }
 
