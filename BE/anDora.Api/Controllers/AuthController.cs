@@ -10,6 +10,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using OtpNet;
 
 namespace anDora.Api.Controllers
 {
@@ -122,13 +123,48 @@ namespace anDora.Api.Controllers
             if (!isPasswordValid)
                 return Unauthorized(new { message = "Invalid credentials" });
 
-            // ← NUEVO: bloquear si no verificó el email
             if (!user.IsActive)
                 return StatusCode(403, new
                 {
                     message = "Debes activar tu cuenta. Revisa tu correo.",
                     code = "EMAIL_NOT_VERIFIED"
                 });
+
+            // If 2FA is enabled, return a flag — no JWT yet
+            if (user.TwoFactorEnabled)
+                return Ok(new
+                {
+                    requiresTwoFactor = true,
+                    username = user.Username
+                });
+
+            var token = GenerateJwtToken(user);
+
+            return Ok(new
+            {
+                message = "Login successful",
+                token,
+                username = user.Username,
+                roles = user.Roles
+            });
+        }
+
+        // ===============================
+        // 🔹 VERIFY 2FA CODE
+        // ===============================
+        [HttpPost("2fa/verify")]
+        public async Task<IActionResult> VerifyTwoFactor([FromBody] TwoFactorLoginRequest request)
+        {
+            var user = await _context.Users
+                .Find(u => u.Username == request.Username)
+                .FirstOrDefaultAsync();
+
+            if (user == null || !user.TwoFactorEnabled || string.IsNullOrEmpty(user.TwoFactorSecret))
+                return Unauthorized(new { message = "Invalid request" });
+
+            var totp = new Totp(Base32Encoding.ToBytes(user.TwoFactorSecret));
+            if (!totp.VerifyTotp(request.Code, out _, VerificationWindow.RfcSpecifiedNetworkDelay))
+                return Unauthorized(new { message = "Invalid or expired code" });
 
             var token = GenerateJwtToken(user);
 
@@ -178,5 +214,11 @@ namespace anDora.Api.Controllers
 
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
+    }
+
+    public class TwoFactorLoginRequest
+    {
+        public string Username { get; set; } = string.Empty;
+        public string Code { get; set; } = string.Empty;
     }
 }

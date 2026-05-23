@@ -4,12 +4,22 @@ import { ref, onMounted } from 'vue'
 import { useToast } from 'primevue/usetoast'
 import api from '@/service/api'
 import { useAuthStore } from '@/stores/authStore'
+import QRCode from 'qrcode'
 
 const toast = useToast()
 const auth = useAuthStore()
 
-const profile = ref({ username: '', email: '', roles: [], createdAt: null, profilePhoto: null })
+const profile = ref({ username: '', email: '', roles: [], createdAt: null, profilePhoto: null, twoFactorEnabled: false })
 const loadingProfile = ref(true)
+
+// 2FA
+const twoFactorEnabled = ref(false)
+const twoFactorSetupMode = ref(false)
+const twoFactorQrUrl = ref('')
+const twoFactorSecret = ref('')
+const twoFactorCode = ref('')
+const twoFactorDisableCode = ref('')
+const loadingTwoFactor = ref(false)
 
 // Password form
 const currentPassword = ref('')
@@ -36,6 +46,7 @@ onMounted(async () => {
     profile.value = res.data
     photoPreview.value = res.data.profilePhoto || null
     newEmail.value = res.data.email
+    twoFactorEnabled.value = res.data.twoFactorEnabled || false
     if (res.data.profilePhoto) auth.setProfilePhoto(res.data.profilePhoto)
   } catch {
     toast.add({ severity: 'error', summary: 'Error', detail: 'Could not load profile', life: 3000 })
@@ -113,6 +124,52 @@ const onFileSelected = (event) => {
   const reader = new FileReader()
   reader.onload = (e) => { photoPreview.value = e.target.result }
   reader.readAsDataURL(file)
+}
+
+/* ===============================
+   2FA SETUP
+================================ */
+const startTwoFactorSetup = async () => {
+  loadingTwoFactor.value = true
+  try {
+    const res = await api.post('/profile/2fa/setup')
+    twoFactorSecret.value = res.data.secret
+    twoFactorQrUrl.value = await QRCode.toDataURL(res.data.uri, { width: 200 })
+    twoFactorSetupMode.value = true
+  } catch {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Could not start 2FA setup', life: 3000 })
+  } finally {
+    loadingTwoFactor.value = false
+  }
+}
+
+const enableTwoFactor = async () => {
+  loadingTwoFactor.value = true
+  try {
+    await api.post('/profile/2fa/enable', { code: twoFactorCode.value })
+    twoFactorEnabled.value = true
+    twoFactorSetupMode.value = false
+    twoFactorCode.value = ''
+    toast.add({ severity: 'success', summary: '2FA Enabled', detail: 'Two-factor authentication is now active', life: 3000 })
+  } catch (err) {
+    toast.add({ severity: 'error', summary: 'Error', detail: err.response?.data?.message || 'Invalid code', life: 3000 })
+  } finally {
+    loadingTwoFactor.value = false
+  }
+}
+
+const disableTwoFactor = async () => {
+  loadingTwoFactor.value = true
+  try {
+    await api.delete('/profile/2fa', { data: { code: twoFactorDisableCode.value } })
+    twoFactorEnabled.value = false
+    twoFactorDisableCode.value = ''
+    toast.add({ severity: 'success', summary: '2FA Disabled', detail: 'Two-factor authentication has been removed', life: 3000 })
+  } catch (err) {
+    toast.add({ severity: 'error', summary: 'Error', detail: err.response?.data?.message || 'Invalid code', life: 3000 })
+  } finally {
+    loadingTwoFactor.value = false
+  }
 }
 
 const uploadPhoto = async () => {
@@ -244,6 +301,54 @@ const uploadPhoto = async () => {
           :loading="loadingPassword"
           @click="changePassword"
         />
+      </div>
+    </div>
+
+    <!-- Two-Factor Authentication -->
+    <div class="card p-6">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h3 class="text-lg font-semibold">Two-Factor Authentication</h3>
+          <p class="text-sm text-surface-500 dark:text-white/60 mt-1">
+            Add an extra layer of security using Google Authenticator.
+          </p>
+        </div>
+        <Tag :value="twoFactorEnabled ? 'Active' : 'Inactive'" :severity="twoFactorEnabled ? 'success' : 'secondary'" />
+      </div>
+
+      <!-- Disabled: show setup button -->
+      <div v-if="!twoFactorEnabled && !twoFactorSetupMode">
+        <Button label="Enable 2FA" icon="pi pi-shield" :loading="loadingTwoFactor" @click="startTwoFactorSetup" />
+      </div>
+
+      <!-- Setup mode: show QR + confirm code -->
+      <div v-if="twoFactorSetupMode" class="flex flex-col gap-4">
+        <p class="text-sm text-surface-600 dark:text-white/70">
+          1. Open <strong>Google Authenticator</strong> and scan this QR code.
+        </p>
+        <div class="flex justify-center">
+          <img :src="twoFactorQrUrl" alt="QR Code" class="rounded-lg border border-surface-200" />
+        </div>
+        <p class="text-xs text-center text-surface-400">
+          Or enter the key manually: <code class="font-mono bg-surface-100 dark:bg-surface-700 px-2 py-0.5 rounded">{{ twoFactorSecret }}</code>
+        </p>
+        <p class="text-sm text-surface-600 dark:text-white/70">
+          2. Enter the 6-digit code shown in the app to confirm.
+        </p>
+        <InputOtp v-model="twoFactorCode" :length="6" integerOnly class="justify-center" />
+        <div class="flex gap-2">
+          <Button label="Confirm & Enable" icon="pi pi-check" :loading="loadingTwoFactor" @click="enableTwoFactor" />
+          <Button label="Cancel" severity="secondary" @click="twoFactorSetupMode = false" />
+        </div>
+      </div>
+
+      <!-- Enabled: show disable section -->
+      <div v-if="twoFactorEnabled" class="flex flex-col gap-3">
+        <p class="text-sm text-surface-500 dark:text-white/60">
+          To disable 2FA, enter your current authenticator code.
+        </p>
+        <InputOtp v-model="twoFactorDisableCode" :length="6" integerOnly class="justify-center" />
+        <Button label="Disable 2FA" icon="pi pi-shield" severity="danger" :loading="loadingTwoFactor" @click="disableTwoFactor" />
       </div>
     </div>
 

@@ -6,6 +6,7 @@ using anDora.Api.Models;
 using anDora.Api.Services;
 using MongoDB.Driver;
 using BCrypt.Net;
+using OtpNet;
 
 namespace anDora.Api.Controllers
 {
@@ -43,7 +44,8 @@ namespace anDora.Api.Controllers
                 email = user.Email,
                 roles = user.Roles,
                 createdAt = user.CreatedAt,
-                profilePhoto = user.ProfilePhoto
+                profilePhoto = user.ProfilePhoto,
+                twoFactorEnabled = user.TwoFactorEnabled
             });
         }
 
@@ -130,6 +132,90 @@ namespace anDora.Api.Controllers
 
             return Ok(new { message = "Profile photo updated", profilePhoto = photoUrl });
         }
+
+        // ===============================
+        // POST /api/profile/2fa/setup
+        // Genera un nuevo secret y devuelve el URI para el QR
+        // ===============================
+        [HttpPost("2fa/setup")]
+        public async Task<IActionResult> Setup2FA()
+        {
+            var username = User.Identity?.Name;
+            var user = await _context.Users
+                .Find(u => u.Username == username)
+                .FirstOrDefaultAsync();
+
+            if (user == null)
+                return NotFound(new { message = "User not found" });
+
+            var secretBytes = KeyGeneration.GenerateRandomKey(20);
+            var secret = Base32Encoding.ToString(secretBytes);
+
+            var update = Builders<User>.Update.Set(u => u.TwoFactorSecret, secret);
+            await _context.Users.UpdateOneAsync(u => u.Id == user.Id, update);
+
+            var uri = $"otpauth://totp/anDora:{username}?secret={secret}&issuer=anDora&algorithm=SHA1&digits=6&period=30";
+
+            return Ok(new { secret, uri });
+        }
+
+        // ===============================
+        // POST /api/profile/2fa/enable
+        // Verifica el primer código y activa 2FA
+        // ===============================
+        [HttpPost("2fa/enable")]
+        public async Task<IActionResult> Enable2FA([FromBody] TwoFactorCodeRequest request)
+        {
+            var username = User.Identity?.Name;
+            var user = await _context.Users
+                .Find(u => u.Username == username)
+                .FirstOrDefaultAsync();
+
+            if (user == null)
+                return NotFound(new { message = "User not found" });
+
+            if (string.IsNullOrEmpty(user.TwoFactorSecret))
+                return BadRequest(new { message = "Run /2fa/setup first" });
+
+            var totp = new Totp(Base32Encoding.ToBytes(user.TwoFactorSecret));
+            if (!totp.VerifyTotp(request.Code, out _, VerificationWindow.RfcSpecifiedNetworkDelay))
+                return BadRequest(new { message = "Invalid code. Try again." });
+
+            var update = Builders<User>.Update.Set(u => u.TwoFactorEnabled, true);
+            await _context.Users.UpdateOneAsync(u => u.Id == user.Id, update);
+
+            return Ok(new { message = "2FA enabled successfully" });
+        }
+
+        // ===============================
+        // DELETE /api/profile/2fa
+        // Desactiva 2FA (requiere código actual)
+        // ===============================
+        [HttpDelete("2fa")]
+        public async Task<IActionResult> Disable2FA([FromBody] TwoFactorCodeRequest request)
+        {
+            var username = User.Identity?.Name;
+            var user = await _context.Users
+                .Find(u => u.Username == username)
+                .FirstOrDefaultAsync();
+
+            if (user == null)
+                return NotFound(new { message = "User not found" });
+
+            if (!user.TwoFactorEnabled)
+                return BadRequest(new { message = "2FA is not enabled" });
+
+            var totp = new Totp(Base32Encoding.ToBytes(user.TwoFactorSecret!));
+            if (!totp.VerifyTotp(request.Code, out _, VerificationWindow.RfcSpecifiedNetworkDelay))
+                return BadRequest(new { message = "Invalid code" });
+
+            var update = Builders<User>.Update
+                .Set(u => u.TwoFactorEnabled, false)
+                .Unset(u => u.TwoFactorSecret);
+            await _context.Users.UpdateOneAsync(u => u.Id == user.Id, update);
+
+            return Ok(new { message = "2FA disabled" });
+        }
     }
 
     public class ChangePasswordRequest
@@ -141,5 +227,10 @@ namespace anDora.Api.Controllers
     public class ChangeEmailRequest
     {
         public string NewEmail { get; set; } = string.Empty;
+    }
+
+    public class TwoFactorCodeRequest
+    {
+        public string Code { get; set; } = string.Empty;
     }
 }

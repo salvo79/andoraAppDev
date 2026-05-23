@@ -54,5 +54,11 @@ namespace anDora.Api.Models
 
         [BsonElement("profilePhoto")]
         public string? ProfilePhoto { get; set; }
+
+        [BsonElement("twoFactorEnabled")]
+        public bool TwoFactorEnabled { get; set; } = false;
+
+        [BsonElement("twoFactorSecret")]
+        public string? TwoFactorSecret { get; set; }
     }
 }

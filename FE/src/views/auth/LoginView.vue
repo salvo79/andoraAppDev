@@ -24,55 +24,78 @@ const password = ref('')
 const loading = ref(false)
 const errorMessage = ref('')
 
+// 2FA step
+const twoFactorRequired = ref(false)
+const twoFactorUsername = ref('')
+const twoFactorCode = ref('')
+
 /* ===============================
    LOGIN
 ================================ */
 const login = async () => {
-
   loading.value = true
   errorMessage.value = ''
 
   try {
-
     const response = await api.post('/auth/login', {
       username: username.value,
       password: password.value
     })
-  
 
-    const token = response.data.token
+    if (response.data.requiresTwoFactor) {
+      twoFactorUsername.value = response.data.username
+      twoFactorRequired.value = true
+      return
+    }
 
-    localStorage.setItem("token", token)
-
-    const auth = useAuthStore()
-    //auth.loadSession()
-
-
-    auth.user = response.data.username
-    auth.isAuthenticated = true
-
-    // Load profile photo into store
-    try {
-      const profile = await api.get('/profile')
-      if (profile.data.profilePhoto) auth.setProfilePhoto(profile.data.profilePhoto)
-    } catch { /* no photo yet */ }
-
-    toast.add({
-      severity: 'success',
-      summary: 'Login successful',
-      detail: `Welcome ${response.data.username}`,
-      life: 3000
-    })
-  console.log('Estoy aqui')
-    router.push({ name: 'dashboard-marketing' })
+    await finalizeLogin(response.data)
 
   } catch (error) {
-
     errorMessage.value = "Invalid username or password"
-
   } finally {
     loading.value = false
   }
+}
+
+/* ===============================
+   VERIFY 2FA CODE
+================================ */
+const verifyTwoFactor = async () => {
+  loading.value = true
+  errorMessage.value = ''
+
+  try {
+    const response = await api.post('/auth/2fa/verify', {
+      username: twoFactorUsername.value,
+      code: twoFactorCode.value
+    })
+
+    await finalizeLogin(response.data)
+
+  } catch {
+    errorMessage.value = "Invalid or expired code"
+  } finally {
+    loading.value = false
+  }
+}
+
+/* ===============================
+   FINALIZE LOGIN (shared)
+================================ */
+const finalizeLogin = async (data) => {
+  localStorage.setItem('token', data.token)
+
+  const auth = useAuthStore()
+  auth.user = data.username
+  auth.isAuthenticated = true
+
+  try {
+    const profile = await api.get('/profile')
+    if (profile.data.profilePhoto) auth.setProfilePhoto(profile.data.profilePhoto)
+  } catch { /* no photo yet */ }
+
+  toast.add({ severity: 'success', summary: 'Login successful', detail: `Welcome ${data.username}`, life: 3000 })
+  router.push({ name: 'dashboard-marketing' })
 }
 
 /* ===============================
@@ -98,7 +121,7 @@ class="w-full h-full inset-0 bg-white/64 dark:bg-surface-800 absolute top-1/2 le
 />
 
 <form
-@submit.prevent="login"
+@submit.prevent="twoFactorRequired ? verifyTwoFactor() : login()"
 class="space-y-8 p-8 relative z-10 bg-white/64 dark:bg-surface-800 backdrop-blur-[90px] rounded-3xl shadow-[0px_87px_24px_0px_rgba(120,149,206,0.00),0px_56px_22px_0px_rgba(120,149,206,0.01),0px_31px_19px_0px_rgba(120,149,206,0.03),0px_14px_14px_0px_rgba(120,149,206,0.04),0px_3px_8px_0px_rgba(120,149,206,0.06)]"
 >
 
@@ -118,37 +141,29 @@ Enter your username and password to access your account.
 
 </div>
 
+<!-- Step 1: username + password -->
+<template v-if="!twoFactorRequired">
 <div class="flex flex-col gap-2">
-
-<label for="username" class="font-medium text-surface-500 dark:text-white/64">
-Usar Name
-</label>
-
-<InputText
-ref="usernameInput"
-id="username"
-v-model="username"
-class="w-full"
-/>
-
+<label for="username" class="font-medium text-surface-500 dark:text-white/64">User Name</label>
+<InputText ref="usernameInput" id="username" v-model="username" class="w-full" />
 </div>
 
 <div class="flex flex-col gap-2">
-
-<label for="password" class="font-medium text-surface-500 dark:text-white/64">
-Password
-</label>
-
-<Password
-id="password"
-v-model="password"
-toggleMask
-:feedback="false"
-class="w-full"
-inputClass="w-full"
-/>
-
+<label for="password" class="font-medium text-surface-500 dark:text-white/64">Password</label>
+<Password id="password" v-model="password" toggleMask :feedback="false" class="w-full" inputClass="w-full" />
 </div>
+</template>
+
+<!-- Step 2: 2FA code -->
+<template v-else>
+<div class="flex flex-col items-center gap-4 py-4">
+  <i class="pi pi-shield text-5xl text-primary" />
+  <p class="text-center text-surface-500 dark:text-white/64">
+    Enter the 6-digit code from your Google Authenticator app.
+  </p>
+  <InputOtp v-model="twoFactorCode" :length="6" integerOnly class="justify-center" />
+</div>
+</template>
 
 <p
 v-if="errorMessage"
@@ -157,41 +172,16 @@ class="text-red-500 text-sm text-center mt-2"
 {{ errorMessage }}
 </p>
 
-<div class="flex items-center justify-between">
-
+<div v-if="!twoFactorRequired" class="flex items-center justify-between">
 <div class="flex items-center gap-2">
-
-<Checkbox
-id="remember"
-v-model="remember"
-binary
-/>
-
-<label
-for="remember"
-class="text-surface-500 dark:text-white/64"
->
-Remember me
-</label>
-
+<Checkbox id="remember" v-model="remember" binary />
+<label for="remember" class="text-surface-500 dark:text-white/64">Remember me</label>
+</div>
+<a href="" class="font-semibold text-primary">Forgot password?</a>
 </div>
 
-<a
-href=""
-class="font-semibold text-primary"
->
-Forgot password?
-</a>
-
-</div>
-
-<Button
-type="submit"
-:loading="loading"
-class="w-full"
-rounded
->
-Login
+<Button type="submit" :loading="loading" class="w-full" rounded>
+{{ twoFactorRequired ? 'Verify Code' : 'Login' }}
 </Button>
 
 <div class="flex items-center justify-center gap-2">
