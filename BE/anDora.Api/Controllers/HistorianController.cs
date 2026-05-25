@@ -22,7 +22,8 @@ namespace anDora.Api.Controllers
             return await _ctx.Users.Find(u => u.Username == username).FirstOrDefaultAsync();
         }
 
-        // GET /api/historian  — análisis propios + compartidos del tenant
+        // GET /api/historian
+        // Devuelve: propios + compartidos con toda la empresa + compartidos específicamente con el usuario
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
@@ -31,22 +32,25 @@ namespace anDora.Api.Controllers
 
             var tenantSlug = user.TenantSlug ?? string.Empty;
 
-            FilterDefinition<HistorianAnalysis> filter;
+            // Filtro 1: propios (todos los estados, incluyendo drafts)
+            var ownFilter = Builders<HistorianAnalysis>.Filter.Eq(a => a.OwnerUsername, user.Username);
 
-            if (!string.IsNullOrEmpty(tenantSlug))
-            {
-                filter = Builders<HistorianAnalysis>.Filter.Or(
-                    Builders<HistorianAnalysis>.Filter.Eq(a => a.OwnerUsername, user.Username),
-                    Builders<HistorianAnalysis>.Filter.And(
-                        Builders<HistorianAnalysis>.Filter.Eq(a => a.IsShared, true),
-                        Builders<HistorianAnalysis>.Filter.Eq(a => a.TenantSlug, tenantSlug)
-                    )
-                );
-            }
-            else
-            {
-                filter = Builders<HistorianAnalysis>.Filter.Eq(a => a.OwnerUsername, user.Username);
-            }
+            // Filtro 2: compartidos con toda la empresa (solo publicados)
+            var tenantFilter = !string.IsNullOrEmpty(tenantSlug)
+                ? Builders<HistorianAnalysis>.Filter.And(
+                    Builders<HistorianAnalysis>.Filter.Eq(a => a.IsShared, true),
+                    Builders<HistorianAnalysis>.Filter.Eq(a => a.TenantSlug, tenantSlug),
+                    Builders<HistorianAnalysis>.Filter.Eq(a => a.Status, "published"))
+                : Builders<HistorianAnalysis>.Filter.Empty;
+
+            // Filtro 3: compartidos específicamente con este usuario (solo publicados)
+            var sharedWithFilter = Builders<HistorianAnalysis>.Filter.And(
+                Builders<HistorianAnalysis>.Filter.AnyEq(a => a.SharedWith, user.Username),
+                Builders<HistorianAnalysis>.Filter.Eq(a => a.Status, "published"));
+
+            var filter = !string.IsNullOrEmpty(tenantSlug)
+                ? Builders<HistorianAnalysis>.Filter.Or(ownFilter, tenantFilter, sharedWithFilter)
+                : Builders<HistorianAnalysis>.Filter.Or(ownFilter, sharedWithFilter);
 
             var list = await _ctx.HistorianAnalyses
                 .Find(filter)
@@ -56,7 +60,7 @@ namespace anDora.Api.Controllers
             return Ok(list);
         }
 
-        // POST /api/historian  — crear análisis
+        // POST /api/historian — crear análisis
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] SaveAnalysisRequest req)
         {
@@ -69,7 +73,9 @@ namespace anDora.Api.Controllers
                 TenantSlug    = user.TenantSlug ?? string.Empty,
                 Name          = req.Name,
                 Description   = req.Description,
+                Status        = req.Status,
                 IsShared      = req.IsShared,
+                SharedWith    = req.SharedWith,
                 Range         = req.Range,
                 Tags          = req.Tags,
                 CalcVars      = req.CalcVars,
@@ -81,7 +87,7 @@ namespace anDora.Api.Controllers
             return Ok(analysis);
         }
 
-        // PUT /api/historian/{id}  — actualizar (solo propietario)
+        // PUT /api/historian/{id} — actualizar contenido y metadatos (solo propietario)
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(string id, [FromBody] SaveAnalysisRequest req)
         {
@@ -97,7 +103,9 @@ namespace anDora.Api.Controllers
             var update = Builders<HistorianAnalysis>.Update
                 .Set(a => a.Name,        req.Name)
                 .Set(a => a.Description, req.Description)
+                .Set(a => a.Status,      req.Status)
                 .Set(a => a.IsShared,    req.IsShared)
+                .Set(a => a.SharedWith,  req.SharedWith)
                 .Set(a => a.Range,       req.Range)
                 .Set(a => a.Tags,        req.Tags)
                 .Set(a => a.CalcVars,    req.CalcVars)
@@ -109,7 +117,24 @@ namespace anDora.Api.Controllers
             return Ok(updated);
         }
 
-        // DELETE /api/historian/{id}  — eliminar (solo propietario)
+        // PATCH /api/historian/{id}/publish — cambiar draft → published
+        [HttpPatch("{id}/publish")]
+        public async Task<IActionResult> Publish(string id)
+        {
+            var user = await CurrentUser();
+            if (user == null) return Unauthorized();
+
+            var result = await _ctx.HistorianAnalyses.UpdateOneAsync(
+                a => a.Id == id && a.OwnerUsername == user.Username,
+                Builders<HistorianAnalysis>.Update
+                    .Set(a => a.Status,    "published")
+                    .Set(a => a.UpdatedAt, DateTime.UtcNow));
+
+            if (result.MatchedCount == 0) return NotFound();
+            return Ok(new { status = "published" });
+        }
+
+        // DELETE /api/historian/{id} — eliminar (solo propietario)
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(string id)
         {

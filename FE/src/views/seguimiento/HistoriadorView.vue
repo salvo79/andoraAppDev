@@ -21,7 +21,7 @@ const RIGHT_W   = 270;
 // ══════════════════════════════════════════════════════════════════════════════
 let tabCounter = 1;
 const tabs = ref([
-    { id: 1, dbId: null, title: 'Análisis 1', description: '', isShared: false, tags: [], calcVars: [], range: '1d' },
+    { id: 1, dbId: null, title: 'Análisis 1', description: '', status: 'draft', isShared: false, sharedWith: [], tags: [], calcVars: [], range: '1d' },
 ]);
 const activeId  = ref(1);
 const activeTab = computed(() => tabs.value.find(t => t.id === activeId.value));
@@ -33,7 +33,7 @@ function closeTab(id) {
     tabs.value = tabs.value.filter(t => t.id !== id);
     if (!tabs.value.length) {
         tabCounter++;
-        tabs.value = [{ id: tabCounter, dbId: null, title: 'Análisis 1', description: '', isShared: false, tags: [], calcVars: [], range: '1d' }];
+        tabs.value = [{ id: tabCounter, dbId: null, title: 'Análisis 1', description: '', status: 'draft', isShared: false, sharedWith: [], tags: [], calcVars: [], range: '1d' }];
     }
     activeId.value = tabs.value[Math.min(idx, tabs.value.length - 1)].id;
 }
@@ -101,7 +101,9 @@ async function doSave(tab) {
             id:          tab.dbId || undefined,
             name:        tab.title,
             description: tab.description || '',
-            isShared:    tab.isShared || false,
+            status:      tab.status      || 'draft',
+            isShared:    tab.isShared    || false,
+            sharedWith:  tab.sharedWith  || [],
             range:       tab.range,
             tags:        tab.tags,
             calcVars:    tab.calcVars || [],
@@ -126,11 +128,11 @@ watch(tabs, () => {
 // DIALOG: NUEVO ANÁLISIS
 // ══════════════════════════════════════════════════════════════════════════════
 const showNewTabDialog = ref(false);
-const newTabForm       = ref({ name: '', description: '', isShared: false });
+const newTabForm       = ref({ name: '', description: '', status: 'draft', isShared: false });
 
 function newTab() {
     tabCounter++;
-    newTabForm.value = { name: `Análisis ${tabCounter}`, description: '', isShared: false };
+    newTabForm.value = { name: `Análisis ${tabCounter}`, description: '', status: 'draft', isShared: false };
     showNewTabDialog.value = true;
 }
 
@@ -140,7 +142,9 @@ async function confirmNewTab() {
         dbId:        null,
         title:       newTabForm.value.name.trim() || `Análisis ${tabCounter}`,
         description: newTabForm.value.description.trim(),
+        status:      newTabForm.value.status,
         isShared:    newTabForm.value.isShared,
+        sharedWith:  [],
         tags:        [],
         calcVars:    [],
         range:       '1d',
@@ -160,12 +164,12 @@ function cancelNewTab() {
 // DIALOG: GUARDAR ANÁLISIS LOCAL (sin dbId)
 // ══════════════════════════════════════════════════════════════════════════════
 const showSaveCurrent = ref(false);
-const saveCurrentForm = ref({ name: '', description: '', isShared: false });
+const saveCurrentForm = ref({ name: '', description: '', status: 'draft', isShared: false });
 
 function promptSaveCurrent() {
     const tab = activeTab.value;
     if (!tab || tab.dbId) return;
-    saveCurrentForm.value = { name: tab.title, description: tab.description || '', isShared: tab.isShared || false };
+    saveCurrentForm.value = { name: tab.title, description: tab.description || '', status: tab.status || 'draft', isShared: tab.isShared || false };
     showSaveCurrent.value = true;
 }
 
@@ -174,6 +178,7 @@ async function confirmSaveCurrent() {
     if (!tab) return;
     tab.title       = saveCurrentForm.value.name.trim() || tab.title;
     tab.description = saveCurrentForm.value.description.trim();
+    tab.status      = saveCurrentForm.value.status;
     tab.isShared    = saveCurrentForm.value.isShared;
     showSaveCurrent.value = false;
     await doSave(tab);
@@ -196,7 +201,7 @@ onMounted(async () => {
 function openFromLibrary(saved) {
     const existing = tabs.value.find(t => t.dbId === saved.id);
     if (existing) {
-        activeId.value   = existing.id;
+        activeId.value    = existing.id;
         showLibrary.value = false;
         return;
     }
@@ -206,16 +211,93 @@ function openFromLibrary(saved) {
         dbId:        saved.id,
         title:       saved.name,
         description: saved.description || '',
+        status:      saved.status      || 'draft',
         isShared:    saved.isShared,
-        tags:        saved.tags     || [],
-        calcVars:    saved.calcVars || [],
-        range:       saved.range    || '1d',
+        sharedWith:  saved.sharedWith  || [],
+        tags:        saved.tags        || [],
+        calcVars:    saved.calcVars    || [],
+        range:       saved.range       || '1d',
     };
     tabs.value.push(tab);
     activeId.value    = tab.id;
     showLibrary.value = false;
     saveStatus.value  = 'saved';
 }
+
+// ── Publicar análisis (draft → published) ─────────────────────────────────────
+async function publishFromLibrary(id) {
+    await historianService.publish(id);
+    const entry = library.value.find(a => a.id === id);
+    if (entry) entry.status = 'published';
+    const tab = tabs.value.find(t => t.dbId === id);
+    if (tab) tab.status = 'published';
+}
+
+// ── Compartir con usuario específico ──────────────────────────────────────────
+const showShareDialog   = ref(false);
+const shareTarget       = ref(null);   // el análisis que se está compartiendo
+const shareUsername     = ref('');
+const shareError        = ref('');
+
+function openShareDialog(a) {
+    shareTarget.value   = { ...a, sharedWith: [...(a.sharedWith || [])] };
+    shareUsername.value = '';
+    shareError.value    = '';
+    showShareDialog.value = true;
+}
+
+async function addSharedUser() {
+    const u = shareUsername.value.trim();
+    if (!u) return;
+    if (shareTarget.value.sharedWith.includes(u)) {
+        shareError.value = 'Ya tiene acceso';
+        return;
+    }
+    shareTarget.value.sharedWith.push(u);
+    shareUsername.value = '';
+    shareError.value    = '';
+}
+
+function removeSharedUser(u) {
+    shareTarget.value.sharedWith = shareTarget.value.sharedWith.filter(x => x !== u);
+}
+
+async function confirmShare() {
+    const a = shareTarget.value;
+    await historianService.save({
+        id:         a.id,
+        name:       a.name,
+        description: a.description,
+        status:     a.status,
+        isShared:   a.isShared,
+        sharedWith: a.sharedWith,
+        range:      a.range,
+        tags:       a.tags,
+        calcVars:   a.calcVars,
+    });
+    // actualizar referencia en library y en tab abierta
+    const entry = library.value.find(x => x.id === a.id);
+    if (entry) { entry.isShared = a.isShared; entry.sharedWith = [...a.sharedWith]; }
+    const tab = tabs.value.find(t => t.dbId === a.id);
+    if (tab) { tab.isShared = a.isShared; tab.sharedWith = [...a.sharedWith]; }
+    showShareDialog.value = false;
+}
+
+// ── Filtro de biblioteca ──────────────────────────────────────────────────────
+const libFilter = ref('all'); // 'all' | 'mine-draft' | 'mine-published' | 'shared'
+
+const filteredLibrary = computed(() => {
+    switch (libFilter.value) {
+        case 'mine-draft':
+            return library.value.filter(a => a.ownerUsername === authStore.user && a.status === 'draft');
+        case 'mine-published':
+            return library.value.filter(a => a.ownerUsername === authStore.user && a.status === 'published');
+        case 'shared':
+            return library.value.filter(a => a.ownerUsername !== authStore.user);
+        default:
+            return library.value;
+    }
+});
 
 async function deleteFromLibrary(id) {
     try {
@@ -449,6 +531,18 @@ function fmtDate(d) {
                     <textarea v-model="newTabForm.description" class="vs-dtextarea" rows="3"
                               placeholder="Descripción opcional..." />
 
+                    <label class="vs-dlabel" style="margin-top:4px">Estado inicial</label>
+                    <div class="vs-dstatus-row">
+                        <label class="vs-dstatus-opt" :class="newTabForm.status === 'draft' ? 'vs-dstatus-sel' : ''">
+                            <input type="radio" v-model="newTabForm.status" value="draft" />
+                            <i class="pi pi-pencil" /> En desarrollo
+                        </label>
+                        <label class="vs-dstatus-opt" :class="newTabForm.status === 'published' ? 'vs-dstatus-sel vs-dstatus-pub' : ''">
+                            <input type="radio" v-model="newTabForm.status" value="published" />
+                            <i class="pi pi-check-circle" /> Publicado
+                        </label>
+                    </div>
+
                     <label class="vs-dcheck">
                         <input type="checkbox" v-model="newTabForm.isShared" />
                         <span>Compartir con mi empresa</span>
@@ -481,6 +575,18 @@ function fmtDate(d) {
                     <label class="vs-dlabel">Descripción</label>
                     <textarea v-model="saveCurrentForm.description" class="vs-dtextarea" rows="3" />
 
+                    <label class="vs-dlabel" style="margin-top:4px">Estado</label>
+                    <div class="vs-dstatus-row">
+                        <label class="vs-dstatus-opt" :class="saveCurrentForm.status === 'draft' ? 'vs-dstatus-sel' : ''">
+                            <input type="radio" v-model="saveCurrentForm.status" value="draft" />
+                            <i class="pi pi-pencil" /> En desarrollo
+                        </label>
+                        <label class="vs-dstatus-opt" :class="saveCurrentForm.status === 'published' ? 'vs-dstatus-sel vs-dstatus-pub' : ''">
+                            <input type="radio" v-model="saveCurrentForm.status" value="published" />
+                            <i class="pi pi-check-circle" /> Publicado
+                        </label>
+                    </div>
+
                     <label class="vs-dcheck">
                         <input type="checkbox" v-model="saveCurrentForm.isShared" />
                         <span>Compartir con mi empresa</span>
@@ -504,10 +610,26 @@ function fmtDate(d) {
                 <div class="vs-dialog-header">
                     <div style="display:flex;align-items:center;gap:8px">
                         <i class="pi pi-folder-open" />
-                        <span>Mis Análisis</span>
-                        <span class="vs-lib-count">{{ library.length }}</span>
+                        <span>Biblioteca de Análisis</span>
+                        <span class="vs-lib-count">{{ filteredLibrary.length }}</span>
                     </div>
                     <button class="vs-lib-close" @click="showLibrary = false">×</button>
+                </div>
+
+                <!-- Filtros -->
+                <div class="vs-lib-filters">
+                    <button class="vs-libf-btn" :class="libFilter === 'all'           ? 'vs-libf-active' : ''" @click="libFilter = 'all'">
+                        <i class="pi pi-list" /> Todos
+                    </button>
+                    <button class="vs-libf-btn" :class="libFilter === 'mine-draft'    ? 'vs-libf-active' : ''" @click="libFilter = 'mine-draft'">
+                        <i class="pi pi-pencil" /> En desarrollo
+                    </button>
+                    <button class="vs-libf-btn" :class="libFilter === 'mine-published'? 'vs-libf-active' : ''" @click="libFilter = 'mine-published'">
+                        <i class="pi pi-check-circle" /> Publicados
+                    </button>
+                    <button class="vs-libf-btn" :class="libFilter === 'shared'        ? 'vs-libf-active' : ''" @click="libFilter = 'shared'">
+                        <i class="pi pi-share-alt" /> Compartidos conmigo
+                    </button>
                 </div>
 
                 <div class="vs-lib-body">
@@ -518,33 +640,70 @@ function fmtDate(d) {
                     </div>
 
                     <!-- Sin análisis -->
-                    <div v-else-if="!library.length" class="vs-lib-empty">
+                    <div v-else-if="!filteredLibrary.length" class="vs-lib-empty">
                         <i class="pi pi-inbox" style="font-size:2.2rem;opacity:.25" />
-                        <p style="margin:8px 0 0;opacity:.5;font-size:.78rem">No hay análisis guardados</p>
-                        <p style="margin:2px 0 0;opacity:.4;font-size:.7rem">Usa "+" para crear y guardar uno</p>
+                        <p style="margin:8px 0 0;opacity:.5;font-size:.78rem">
+                            {{ library.length ? 'Sin resultados en este filtro' : 'No hay análisis guardados' }}
+                        </p>
+                        <p v-if="!library.length" style="margin:2px 0 0;opacity:.4;font-size:.7rem">Usa "+" para crear y guardar uno</p>
                     </div>
 
                     <!-- Grid de análisis -->
                     <div v-else class="vs-lib-grid">
-                        <div v-for="a in library" :key="a.id"
+                        <div v-for="a in filteredLibrary" :key="a.id"
                              class="vs-lib-card" @click="openFromLibrary(a)">
+
                             <div class="vs-lc-top">
                                 <i class="pi pi-chart-line vs-lc-icon" />
                                 <div class="vs-lc-name">{{ a.name }}</div>
+
+                                <!-- Badge de estado -->
+                                <span class="vs-status-badge"
+                                      :class="a.status === 'published' ? 'vs-status-pub' : 'vs-status-draft'">
+                                    <i :class="a.status === 'published' ? 'pi pi-check-circle' : 'pi pi-pencil'" />
+                                    {{ a.status === 'published' ? 'Publicado' : 'En desarrollo' }}
+                                </span>
+
+                                <!-- Badge compartido con empresa -->
                                 <span v-if="a.isShared" class="vs-shared-badge">
-                                    <i class="pi pi-share-alt" /> Compartido
+                                    <i class="pi pi-building" /> Empresa
+                                </span>
+                                <!-- Badge compartido con usuarios específicos -->
+                                <span v-if="a.sharedWith?.length" class="vs-shared-badge vs-shared-users">
+                                    <i class="pi pi-users" /> {{ a.sharedWith.length }}
                                 </span>
                             </div>
+
                             <div v-if="a.description" class="vs-lc-desc">{{ a.description }}</div>
+
                             <div class="vs-lc-meta">
                                 <span><i class="pi pi-user" /> {{ a.ownerUsername }}</span>
                                 <span><i class="pi pi-tag" /> {{ (a.tags?.length || 0) + (a.calcVars?.length || 0) }} vars</span>
                                 <span><i class="pi pi-calendar" /> {{ fmtDate(a.updatedAt) }}</span>
                             </div>
+
                             <div class="vs-lc-actions">
                                 <button class="vs-lc-open" @click.stop="openFromLibrary(a)">
                                     <i class="pi pi-external-link" /> Abrir
                                 </button>
+
+                                <!-- Publicar (solo propietario con status draft) -->
+                                <button v-if="a.ownerUsername === authStore.user && a.status === 'draft'"
+                                        class="vs-lc-publish"
+                                        title="Publicar análisis"
+                                        @click.stop="publishFromLibrary(a.id)">
+                                    <i class="pi pi-check-circle" />
+                                </button>
+
+                                <!-- Compartir (solo propietario) -->
+                                <button v-if="a.ownerUsername === authStore.user"
+                                        class="vs-lc-share"
+                                        title="Compartir con usuarios"
+                                        @click.stop="openShareDialog(a)">
+                                    <i class="pi pi-share-alt" />
+                                </button>
+
+                                <!-- Eliminar (solo propietario) -->
                                 <button v-if="a.ownerUsername === authStore.user"
                                         class="vs-lc-del"
                                         title="Eliminar análisis"
@@ -554,6 +713,60 @@ function fmtDate(d) {
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ════════════════════════════════════════════════════════════════
+             DIALOG: COMPARTIR CON USUARIOS
+        ════════════════════════════════════════════════════════════════ -->
+        <div v-if="showShareDialog && shareTarget" class="vs-overlay" @click.self="showShareDialog = false">
+            <div class="vs-dialog" style="min-width:420px">
+                <div class="vs-dialog-header">
+                    <i class="pi pi-share-alt" />
+                    <span>Compartir — {{ shareTarget.name }}</span>
+                </div>
+                <div class="vs-dialog-body">
+
+                    <!-- Compartir con toda la empresa -->
+                    <label class="vs-dcheck" style="margin-bottom:10px">
+                        <input type="checkbox" v-model="shareTarget.isShared" />
+                        <i class="pi pi-building" style="color:var(--p-primary-color)" />
+                        <span>Visible para toda mi empresa</span>
+                    </label>
+
+                    <!-- Compartir con usuarios específicos -->
+                    <label class="vs-dlabel">Agregar usuarios específicos</label>
+                    <div class="vs-share-input-row">
+                        <input v-model="shareUsername" class="vs-dinput"
+                               placeholder="Nombre de usuario..."
+                               @keyup.enter="addSharedUser" />
+                        <button class="vs-dbtn vs-dbtn-primary" style="white-space:nowrap"
+                                @click="addSharedUser">
+                            <i class="pi pi-plus" /> Agregar
+                        </button>
+                    </div>
+                    <p v-if="shareError" style="color:#ef4444;font-size:.72rem;margin:2px 0">{{ shareError }}</p>
+
+                    <!-- Lista de usuarios con acceso -->
+                    <div v-if="shareTarget.sharedWith.length" class="vs-share-list">
+                        <div v-for="u in shareTarget.sharedWith" :key="u" class="vs-share-user">
+                            <i class="pi pi-user" style="color:var(--p-primary-color)" />
+                            <span>{{ u }}</span>
+                            <button class="vs-share-remove" @click="removeSharedUser(u)">
+                                <i class="pi pi-times" />
+                            </button>
+                        </div>
+                    </div>
+                    <p v-else style="font-size:.72rem;opacity:.45;margin:6px 0">
+                        Sin usuarios específicos aún
+                    </p>
+                </div>
+                <div class="vs-dialog-footer">
+                    <button class="vs-dbtn vs-dbtn-ghost" @click="showShareDialog = false">Cancelar</button>
+                    <button class="vs-dbtn vs-dbtn-primary" @click="confirmShare">
+                        <i class="pi pi-check" /> Guardar cambios
+                    </button>
                 </div>
             </div>
         </div>
@@ -913,4 +1126,101 @@ function fmtDate(d) {
     font-size: 0.7rem;
 }
 .vs-lc-del:hover { background: #fef2f2; border-color: #fca5a5; color: #ef4444; }
+
+.vs-lc-publish {
+    display: flex; align-items: center; justify-content: center;
+    width: 26px; height: 26px; border-radius: 3px;
+    background: transparent; border: 1px solid var(--p-surface-300);
+    color: #22c55e; cursor: pointer; font-size: 0.7rem;
+}
+.vs-lc-publish:hover { background: #f0fdf4; border-color: #86efac; }
+
+.vs-lc-share {
+    display: flex; align-items: center; justify-content: center;
+    width: 26px; height: 26px; border-radius: 3px;
+    background: transparent; border: 1px solid var(--p-surface-300);
+    color: var(--p-primary-color); cursor: pointer; font-size: 0.7rem;
+}
+.vs-lc-share:hover { background: #eff6ff; border-color: #93c5fd; }
+
+/* ── Status badges ─────────────────────────────────────────────────────────── */
+.vs-status-badge {
+    display: flex; align-items: center; gap: 3px;
+    border-radius: 10px; font-size: 0.6rem;
+    padding: 1px 6px; font-weight: 600; flex-shrink: 0;
+}
+.vs-status-draft {
+    background: #fef3c7; color: #92400e; border: 1px solid #fcd34d;
+}
+.vs-status-pub {
+    background: #dcfce7; color: #166534; border: 1px solid #86efac;
+}
+.vs-shared-users {
+    background: #ede9fe; color: #5b21b6; border-color: #c4b5fd;
+}
+
+/* ── Library filters ───────────────────────────────────────────────────────── */
+.vs-lib-filters {
+    display: flex; gap: 4px; padding: 8px 14px;
+    border-bottom: 1px solid var(--p-surface-200);
+    background: var(--p-surface-50);
+    flex-wrap: wrap;
+}
+.vs-libf-btn {
+    display: flex; align-items: center; gap: 4px;
+    padding: 3px 10px; border-radius: 12px;
+    border: 1px solid var(--p-surface-300);
+    background: transparent; cursor: pointer;
+    font-size: 0.68rem; font-weight: 600;
+    color: var(--p-text-muted-color); font-family: inherit;
+}
+.vs-libf-btn:hover { background: var(--p-surface-200); }
+.vs-libf-active {
+    background: var(--p-primary-50, #eff6ff) !important;
+    border-color: var(--p-primary-color) !important;
+    color: var(--p-primary-color) !important;
+}
+
+/* ── Dialog: status selector ───────────────────────────────────────────────── */
+.vs-dstatus-row {
+    display: flex; gap: 8px;
+}
+.vs-dstatus-opt {
+    display: flex; align-items: center; gap: 5px;
+    flex: 1; padding: 6px 10px;
+    border: 1px solid var(--p-surface-300); border-radius: 4px;
+    cursor: pointer; font-size: 0.75rem; color: var(--p-text-muted-color);
+    background: var(--p-surface-50);
+}
+.vs-dstatus-opt input { display: none; }
+.vs-dstatus-sel {
+    border-color: #fcd34d; background: #fef3c7; color: #92400e;
+}
+.vs-dstatus-pub.vs-dstatus-sel {
+    border-color: #86efac; background: #dcfce7; color: #166534;
+}
+
+/* ── Dialog: compartir ─────────────────────────────────────────────────────── */
+.vs-share-input-row {
+    display: flex; gap: 6px; align-items: center;
+}
+.vs-share-input-row .vs-dinput { flex: 1; }
+
+.vs-share-list {
+    display: flex; flex-direction: column; gap: 4px;
+    margin-top: 6px; max-height: 160px; overflow-y: auto;
+}
+.vs-share-user {
+    display: flex; align-items: center; gap: 6px;
+    padding: 4px 8px; border-radius: 4px;
+    background: var(--p-surface-100);
+    font-size: 0.75rem;
+}
+.vs-share-user span { flex: 1; }
+.vs-share-remove {
+    background: none; border: none; cursor: pointer;
+    color: var(--p-text-muted-color); font-size: 0.7rem;
+    padding: 2px; border-radius: 2px;
+}
+.vs-share-remove:hover { color: #ef4444; background: #fef2f2; }
 </style>

@@ -40,9 +40,18 @@ namespace anDora.Api.Models
         [JsonPropertyName("range")]
         public string Range { get; set; } = "1d";
 
+        [BsonElement("status")]
+        [JsonPropertyName("status")]
+        public string Status { get; set; } = "draft"; // "draft" | "published"
+
         [BsonElement("isShared")]
         [JsonPropertyName("isShared")]
         public bool IsShared { get; set; } = false;
+
+        // Usuarios específicos con acceso (además del propietario y tenant si isShared=true)
+        [BsonElement("sharedWith")]
+        [JsonPropertyName("sharedWith")]
+        public List<string> SharedWith { get; set; } = new();
 
         [BsonElement("createdAt")]
         [JsonPropertyName("createdAt")]
@@ -140,8 +149,14 @@ namespace anDora.Api.Models
         [JsonPropertyName("description")]
         public string Description { get; set; } = string.Empty;
 
+        [JsonPropertyName("status")]
+        public string Status { get; set; } = "draft";
+
         [JsonPropertyName("isShared")]
         public bool IsShared { get; set; }
+
+        [JsonPropertyName("sharedWith")]
+        public List<string> SharedWith { get; set; } = new();
 
         [JsonPropertyName("range")]
         public string Range { get; set; } = "1d";

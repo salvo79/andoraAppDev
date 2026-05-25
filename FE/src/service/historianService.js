@@ -15,6 +15,11 @@ export default {
         return res.data;
     },
 
+    async publish(id) {
+        const res = await api.patch(`/historian/${id}/publish`);
+        return res.data;
+    },
+
     async remove(id) {
         await api.delete(`/historian/${id}`);
     },
