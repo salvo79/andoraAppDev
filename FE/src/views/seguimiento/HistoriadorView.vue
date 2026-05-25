@@ -17,14 +17,14 @@ const RIGHT_W   = 270;  // px cuando abierto
 // ── Tabs de análisis ──────────────────────────────────────────────────────────
 let   tabCounter = 1;
 const tabs = ref([
-    { id: 1, title: 'Análisis 1', tags: [], calcVars: [], range: '8h' },
+    { id: 1, title: 'Análisis 1', tags: [], calcVars: [], range: '1d' },
 ]);
 const activeId  = ref(1);
 const activeTab = computed(() => tabs.value.find(t => t.id === activeId.value));
 
 function newTab() {
     tabCounter++;
-    const tab = { id: tabCounter, title: `Análisis ${tabCounter}`, tags: [], calcVars: [], range: '8h' };
+    const tab = { id: tabCounter, title: `Análisis ${tabCounter}`, tags: [], calcVars: [], range: '1d' };
     tabs.value.push(tab);
     activeId.value = tab.id;
 }
@@ -32,7 +32,7 @@ function newTab() {
 function closeTab(id) {
     const idx = tabs.value.findIndex(t => t.id === id);
     tabs.value = tabs.value.filter(t => t.id !== id);
-    if (!tabs.value.length) { tabCounter++; tabs.value = [{ id: tabCounter, title: 'Análisis 1', tags: [], calcVars: [], range: '8h' }]; }
+    if (!tabs.value.length) { tabCounter++; tabs.value = [{ id: tabCounter, title: 'Análisis 1', tags: [], calcVars: [], range: '1d' }]; }
     activeId.value = tabs.value[Math.min(idx, tabs.value.length - 1)].id;
 }
 
@@ -68,13 +68,11 @@ function removeCalcVar(key) {
 
 // ── Rango temporal ────────────────────────────────────────────────────────────
 const RANGES = [
-    { label: '30m', value: '1h'  },
-    { label: '1h',  value: '1h'  },
-    { label: '4h',  value: '4h'  },
-    { label: '8h',  value: '8h'  },
-    { label: '24h', value: '24h' },
-    { label: '3d',  value: '3d'  },
-    { label: '7d',  value: '7d'  },
+    { label: '1d',  value: '1d'   },
+    { label: '7d',  value: '7d'   },
+    { label: '1m',  value: '1mo'  },
+    { label: '1a',  value: '1y'   },
+    { label: 'Todo', value: 'all' },
 ];
 
 function setRange(r) {
@@ -146,7 +144,7 @@ const activeTagCount = computed(() =>
                 v-for="r in RANGES"
                 :key="r.label"
                 class="vs-tbtn vs-range-btn"
-                :class="activeTab?.range === r.value && r.label !== '30m' ? 'vs-tbtn-active' : ''"
+                :class="activeTab?.range === r.value ? 'vs-tbtn-active' : ''"
                 @click="setRange(r.value)"
             >{{ r.label }}</button>
 
