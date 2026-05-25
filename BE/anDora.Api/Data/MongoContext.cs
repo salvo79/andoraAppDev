@@ -21,5 +21,8 @@ namespace anDora.Api.Data
                     // ← AGREGA ESTA LÍNEA
         public IMongoCollection<Tenant> Tenants =>
             _database.GetCollection<Tenant>("tenants");
+
+        public IMongoCollection<HistorianAnalysis> HistorianAnalyses =>
+            _database.GetCollection<HistorianAnalysis>("historian_analyses");
     }
 }
