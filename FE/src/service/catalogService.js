@@ -19,6 +19,7 @@ const catalogService = {
     getProductos:    () => catalogService.getAll('productos'),
     getCorrientes:   () => catalogService.getAll('corrientes'),
     getPrecios:      () => catalogService.getAll('precios'),
+    getTree:         () => api.get(`${BASE}/tree`).then(r => r.data),
 };
 
 export default catalogService;

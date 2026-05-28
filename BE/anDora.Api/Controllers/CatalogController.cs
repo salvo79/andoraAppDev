@@ -296,6 +296,99 @@ namespace anDora.Api.Controllers
         }
 
         // ═══════════════════════════════════════════════════════
+        // ÁRBOL JERÁRQUICO  Company → Sitio → Planta → Tanques / Corrientes
+        // ═══════════════════════════════════════════════════════
+
+        [HttpGet("tree")]
+        public async Task<IActionResult> GetTree()
+        {
+            var sitios     = await _ctx.Sitios.Find(x => x.Activo).SortBy(x => x.Nombre).ToListAsync();
+            var plantas    = await _ctx.Plantas.Find(x => x.Activo).SortBy(x => x.Nombre).ToListAsync();
+            var tanques    = await _ctx.Tanques.Find(x => x.Activo).SortBy(x => x.Clave).ToListAsync();
+            var corrientes = await _ctx.Corrientes.Find(x => x.Activo).SortBy(x => x.Clave).ToListAsync();
+
+            var tree = new List<object>();
+
+            // ── Sitios → Plantas → Tanques ────────────────────────────────
+            foreach (var s in sitios)
+            {
+                var plantaNodes = new List<object>();
+                foreach (var p in plantas.Where(p => p.SitioId == s.Id))
+                {
+                    var tanqueNodes = tanques
+                        .Where(t => t.PlantaId == p.Id)
+                        .Select(t => (object)new
+                        {
+                            id           = $"tanque-{t.Id}",
+                            text         = $"{t.Clave} · {t.Nombre}",
+                            type         = "tanque",
+                            tipoProducto = t.TipoProducto,
+                            capacidadM3  = t.CapacidadM3,
+                            material     = t.Material,
+                        })
+                        .ToList();
+
+                    plantaNodes.Add(new
+                    {
+                        id           = $"planta-{p.Id}",
+                        text         = p.Nombre,
+                        type         = "planta",
+                        clave        = p.Clave,
+                        tipoPlanta   = p.Tipo,
+                        capacidadTon = p.CapacidadTon,
+                        unidad       = p.Unidad,
+                        items        = tanqueNodes,
+                    });
+                }
+
+                tree.Add(new
+                {
+                    id        = $"sitio-{s.Id}",
+                    text      = s.Nombre,
+                    type      = "sitio",
+                    clave     = s.Clave,
+                    ubicacion = s.Ubicacion,
+                    estado    = s.Estado,
+                    items     = plantaNodes,
+                });
+            }
+
+            // ── Corrientes agrupadas por tipo (sin planta específica) ─────
+            if (corrientes.Count > 0)
+            {
+                var grupos = corrientes
+                    .GroupBy(c => c.TipoCorriente ?? "General")
+                    .OrderBy(g => g.Key)
+                    .Select(g => (object)new
+                    {
+                        id   = $"corrtype-{g.Key.ToLower().Replace(" ", "-")}",
+                        text = g.Key,
+                        type = "corriente-tipo",
+                        items = g.Select(c => (object)new
+                        {
+                            id             = $"corriente-{c.Id}",
+                            text           = $"{c.Clave} · {c.Nombre}",
+                            type           = "corriente",
+                            tipoCorriente  = c.TipoCorriente,
+                            unidad         = c.Unidad,
+                            productoNombre = c.ProductoNombre,
+                        }).ToList(),
+                    })
+                    .ToList();
+
+                tree.Add(new
+                {
+                    id    = "seccion-corrientes",
+                    text  = "Corrientes de Proceso",
+                    type  = "seccion",
+                    items = grupos,
+                });
+            }
+
+            return Ok(tree);
+        }
+
+        // ═══════════════════════════════════════════════════════
         // PRECIOS
         // ═══════════════════════════════════════════════════════
 
