@@ -5,6 +5,7 @@ import VarBuilderDock   from '@/components/historiador/VarBuilderDock.vue';
 import { computed, ref, watch, onMounted } from 'vue';
 import { useAuthStore }    from '@/stores/authStore.js';
 import historianService    from '@/service/historianService.js';
+import { operationsService } from '@/service/operationsService.js';
 
 const authStore = useAuthStore();
 
@@ -21,7 +22,7 @@ const RIGHT_W   = 270;
 // ══════════════════════════════════════════════════════════════════════════════
 let tabCounter = 1;
 const tabs = ref([
-    { id: 1, dbId: null, title: 'Análisis 1', description: '', status: 'draft', isShared: false, sharedWith: [], tags: [], calcVars: [], range: '1d' },
+    { id: 1, dbId: null, title: 'Análisis 1', description: '', status: 'draft', isShared: false, sharedWith: [], tags: [], calcVars: [], range: '1d', operMetrics: [] },
 ]);
 const activeId  = ref(1);
 const activeTab = computed(() => tabs.value.find(t => t.id === activeId.value));
@@ -33,7 +34,7 @@ function closeTab(id) {
     tabs.value = tabs.value.filter(t => t.id !== id);
     if (!tabs.value.length) {
         tabCounter++;
-        tabs.value = [{ id: tabCounter, dbId: null, title: 'Análisis 1', description: '', status: 'draft', isShared: false, sharedWith: [], tags: [], calcVars: [], range: '1d' }];
+        tabs.value = [{ id: tabCounter, dbId: null, title: 'Análisis 1', description: '', status: 'draft', isShared: false, sharedWith: [], tags: [], calcVars: [], range: '1d', operMetrics: [] }];
     }
     activeId.value = tabs.value[Math.min(idx, tabs.value.length - 1)].id;
 }
@@ -84,8 +85,65 @@ function removeCalcVar(key) {
 
 function clearAnalysis() {
     if (!activeTab.value) return;
-    activeTab.value.tags     = [];
-    activeTab.value.calcVars = [];
+    activeTab.value.tags        = [];
+    activeTab.value.calcVars    = [];
+    activeTab.value.operMetrics = [];
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MÉTRICAS OPERATIVAS (Producción / Compras / Ventas desde Atlas)
+// ══════════════════════════════════════════════════════════════════════════════
+const metricLoading = ref(false);
+
+async function addMetric(metricData) {
+    const tab = activeTab.value;
+    if (!tab) return;
+    if (!tab.operMetrics) tab.operMetrics = [];
+    if (tab.operMetrics.find(m => m.key === metricData.key)) return;
+    if ((tab.tags.length + tab.operMetrics.length) >= 8) return;
+
+    metricLoading.value = true;
+    try {
+        const series = await operationsService.getSeries(
+            metricData.operData.source,
+            metricData.operData,
+            tab.range,
+        );
+        tab.operMetrics = [...tab.operMetrics, {
+            key:      metricData.key,
+            label:    metricData.label,
+            unidad:   metricData.operData.unidad || '',
+            tipo:     'OPR',
+            operData: metricData.operData,
+            series,
+        }];
+    } finally {
+        metricLoading.value = false;
+    }
+}
+
+function removeMetric(key) {
+    const tab = activeTab.value;
+    if (!tab) return;
+    tab.operMetrics = (tab.operMetrics || []).filter(m => m.key !== key);
+}
+
+// Refetch series cuando cambia el rango
+watch(() => activeTab.value?.range, async (newRange) => {
+    const tab = activeTab.value;
+    if (!tab?.operMetrics?.length || !newRange) return;
+    for (const m of tab.operMetrics) {
+        m.series = await operationsService.getSeries(m.operData.source, m.operData, newRange);
+    }
+});
+
+// Drop zone: recibe métricas arrastradas desde el árbol de operaciones
+function onMetricDrop(e) {
+    const raw = e.dataTransfer.getData('application/andora-metric');
+    if (!raw) return;
+    try {
+        addMetric(JSON.parse(raw));
+    } catch { /* ignore malformed data */ }
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -97,6 +155,14 @@ let saveTimer = null;
 async function doSave(tab) {
     saveStatus.value = 'saving';
     try {
+        // Serializa operMetrics como tags con type='operacion' (sin la serie de datos)
+        const operAsTag = (tab.operMetrics || []).map(m => ({
+            key:      m.key,
+            label:    m.label,
+            type:     'operacion',
+            data:     null,
+            operData: m.operData,
+        }));
         const res = await historianService.save({
             id:          tab.dbId || undefined,
             name:        tab.title,
@@ -105,7 +171,7 @@ async function doSave(tab) {
             isShared:    tab.isShared    || false,
             sharedWith:  tab.sharedWith  || [],
             range:       tab.range,
-            tags:        tab.tags,
+            tags:        [...tab.tags, ...operAsTag],
             calcVars:    tab.calcVars || [],
         });
         if (!tab.dbId) tab.dbId = res.id;
@@ -206,6 +272,10 @@ function openFromLibrary(saved) {
         return;
     }
     tabCounter++;
+    // Separar tags de proceso de métricas operativas guardadas
+    const allTags     = saved.tags || [];
+    const processTags = allTags.filter(t => t.type !== 'operacion');
+    const savedOper   = allTags.filter(t => t.type === 'operacion');
     const tab = {
         id:          tabCounter,
         dbId:        saved.id,
@@ -214,14 +284,22 @@ function openFromLibrary(saved) {
         status:      saved.status      || 'draft',
         isShared:    saved.isShared,
         sharedWith:  saved.sharedWith  || [],
-        tags:        saved.tags        || [],
+        tags:        processTags,
         calcVars:    saved.calcVars    || [],
         range:       saved.range       || '1d',
+        operMetrics: [],
     };
     tabs.value.push(tab);
     activeId.value    = tab.id;
     showLibrary.value = false;
     saveStatus.value  = 'saved';
+    // Refetch series para métricas operativas guardadas (async, no bloquea)
+    savedOper.forEach(async (m) => {
+        try {
+            const series = await operationsService.getSeries(m.operData.source, m.operData, tab.range);
+            tab.operMetrics = [...tab.operMetrics, { key: m.key, label: m.label, unidad: m.operData?.unidad || '', tipo: 'OPR', operData: m.operData, series }];
+        } catch { /* ignora silenciosamente */ }
+    });
 }
 
 // ── Publicar análisis (draft → published) ─────────────────────────────────────
@@ -460,20 +538,28 @@ function fmtDate(d) {
                     <span>Árbol de Proceso</span>
                 </div>
                 <div v-else class="vs-dock-content h-full">
-                    <ProcessTreeDock @add-tag="addTag" />
+                    <ProcessTreeDock @add-tag="addTag" @add-metric="addMetric" />
                 </div>
             </div>
 
-            <!-- Centro: análisis -->
-            <div class="vs-center flex-1">
+            <!-- Centro: análisis (también es drop zone para métricas operativas) -->
+            <div class="vs-center flex-1"
+                 @dragover.prevent
+                 @drop="onMetricDrop">
                 <TrendAnalysis
                     v-if="activeTab"
                     :key="activeId"
                     :tags="activeTab.tags"
                     :calc-vars="activeTab.calcVars"
+                    :oper-metrics="activeTab.operMetrics || []"
                     :range="activeTab.range"
                     @remove-tag="removeTag"
+                    @remove-metric="removeMetric"
                 />
+                <!-- Indicador de carga de métrica -->
+                <div v-if="metricLoading" class="vs-metric-loading">
+                    <i class="pi pi-spin pi-spinner" /> Cargando datos de Atlas...
+                </div>
             </div>
 
             <!-- Dock derecho: Constructor de variables -->
@@ -919,7 +1005,16 @@ function fmtDate(d) {
 .vs-dock-content { display: flex; flex-direction: column; width: 100%; overflow: hidden; }
 
 /* ── Centro / Status bar ───────────────────────────────────────────────────── */
-.vs-center { overflow: hidden; min-height: 0; }
+.vs-center { overflow: hidden; min-height: 0; position: relative; }
+
+.vs-metric-loading {
+    position: absolute; bottom: 12px; right: 16px; z-index: 50;
+    display: flex; align-items: center; gap: 6px;
+    background: var(--p-primary-color); color: #fff;
+    font-size: 0.72rem; padding: 5px 12px; border-radius: 20px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    pointer-events: none;
+}
 
 .vs-statusbar {
     display: flex; align-items: center; gap: 8px;

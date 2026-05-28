@@ -19,11 +19,20 @@ namespace anDora.Api.Models.Operations
         [BsonElement("mes")]
         public int Mes { get; set; }
 
+        [BsonElement("codigo")]
+        public string Codigo { get; set; } = string.Empty;
+
         [BsonElement("nombre")]
         public string Nombre { get; set; } = default!;
 
         [BsonElement("categoria")]
         public string Categoria { get; set; } = default!;
+
+        [BsonElement("familia")]
+        public string Familia { get; set; } = string.Empty;
+
+        [BsonElement("unidad")]
+        public string Unidad { get; set; } = string.Empty;
 
         [BsonElement("precio_neto_mxn")]
         public double PrecioNetoMxn { get; set; }

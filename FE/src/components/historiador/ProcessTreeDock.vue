@@ -1,9 +1,12 @@
 <script setup>
 import { PROCESS_TREE_DX } from '@/service/seguimientoService';
+import OperationsTreeDock from '@/components/historiador/OperationsTreeDock.vue';
 import { DxTreeView } from 'devextreme-vue/tree-view';
 import { ref } from 'vue';
 
-const emit = defineEmits(['add-tag']);
+const emit = defineEmits(['add-tag', 'add-metric']);
+
+const activeTab = ref('tags'); // 'tags' | 'operaciones'
 
 const treeRef = ref(null);
 const search  = ref('');
@@ -49,6 +52,21 @@ function onSearch() {
             <i class="pi pi-sitemap" />
             <span>Árbol de Proceso</span>
         </div>
+
+        <!-- Tabs: Tags | Operaciones ──────────────────────────────────── -->
+        <div class="pdock-tabs">
+            <button class="pdock-tab" :class="{ 'pdock-tab-active': activeTab === 'tags' }"
+                    @click="activeTab = 'tags'">
+                <i class="pi pi-microchip" /> Tags
+            </button>
+            <button class="pdock-tab" :class="{ 'pdock-tab-active': activeTab === 'operaciones' }"
+                    @click="activeTab = 'operaciones'">
+                <i class="pi pi-chart-bar" /> Operaciones
+            </button>
+        </div>
+
+        <!-- ── TAB: Tags ─────────────────────────────────────────────── -->
+        <template v-if="activeTab === 'tags'">
 
         <!-- Búsqueda ────────────────────────────────────────────────────── -->
         <div class="pdock-search">
@@ -102,12 +120,39 @@ function onSearch() {
                 <i class="pi pi-chart-line node-tag-a ml-2" /> Analítico
             </div>
         </div>
+
+        </template><!-- /TAB Tags -->
+
+        <!-- ── TAB: Operaciones ──────────────────────────────────────── -->
+        <template v-else>
+            <OperationsTreeDock
+                class="flex-1 min-h-0"
+                style="overflow:hidden;display:flex;flex-direction:column"
+                @add-metric="m => emit('add-metric', m)"
+            />
+        </template>
+
     </div>
 </template>
 
 <style scoped>
 /* ── Dock ──────────────────────────────────────────────────────────────────── */
 .pdock { background: var(--p-surface-50); font-family: 'Segoe UI', system-ui, sans-serif; }
+
+/* ── Tabs ──────────────────────────────────────────────────────────────────── */
+.pdock-tabs {
+    display: flex; border-bottom: 2px solid var(--p-surface-300);
+    background: var(--p-surface-100);
+}
+.pdock-tab {
+    flex: 1; display: flex; align-items: center; justify-content: center; gap: 4px;
+    padding: 5px 4px; border: none; background: transparent; cursor: pointer;
+    font-size: 0.68rem; font-weight: 600; color: var(--p-text-muted-color);
+    font-family: inherit; border-bottom: 2px solid transparent; margin-bottom: -2px;
+    transition: color 0.15s, border-color 0.15s;
+}
+.pdock-tab:hover { color: var(--p-text-color); }
+.pdock-tab-active { color: var(--p-primary-color); border-bottom-color: var(--p-primary-color); }
 
 .pdock-header {
     display: flex; align-items: center; gap: 6px;

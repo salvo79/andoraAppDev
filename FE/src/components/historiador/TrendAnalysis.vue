@@ -31,11 +31,12 @@ import { computed, ref, watch } from 'vue';
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 const props = defineProps({
-    tags:      { type: Array,  default: () => [] },
-    range:     { type: String, default: '8h' },
-    calcVars:  { type: Array,  default: () => [] }, // variables calculadas
+    tags:        { type: Array,  default: () => [] },
+    range:       { type: String, default: '8h' },
+    calcVars:    { type: Array,  default: () => [] },
+    operMetrics: { type: Array,  default: () => [] }, // métricas de Producción/Compras/Ventas
 });
-const emit = defineEmits(['remove-tag']);
+const emit = defineEmits(['remove-tag', 'remove-metric']);
 
 // ── Refs ──────────────────────────────────────────────────────────────────────
 const chartRef = ref(null);
@@ -107,17 +108,40 @@ const gridData = computed(() => {
 
 // Reset range selector cuando cambia el rango seleccionado
 watch(() => props.range, () => { rsValue.value = null; });
+
+// ── Datos columnar para el chart de operaciones ───────────────────────────────
+const operChartData = computed(() => {
+    if (!props.operMetrics.length) return [];
+    const dateSet = new Set();
+    props.operMetrics.forEach(m => (m.series || []).forEach(p => dateSet.add(p.fecha)));
+    const dates = Array.from(dateSet).sort();
+    return dates.map(date => {
+        const row = { time: date };
+        props.operMetrics.forEach(m => {
+            const point = (m.series || []).find(p => p.fecha === date);
+            if (point) row[m.key] = point.valor;
+        });
+        return row;
+    });
+});
+
+function operColor(m) {
+    const OPER_COLORS = ['#10b981','#3b82f6','#f59e0b','#8b5cf6','#ef4444','#06b6d4','#f97316','#ec4899'];
+    const i = props.operMetrics.indexOf(m);
+    return OPER_COLORS[i % OPER_COLORS.length];
+}
 </script>
 
 <template>
     <div class="ta-root flex flex-column h-full">
 
-        <!-- Sin tags seleccionados ──────────────────────────────────────── -->
-        <div v-if="!allTags.length" class="ta-empty">
+        <!-- Sin tags ni métricas ────────────────────────────────────────── -->
+        <div v-if="!allTags.length && !props.operMetrics.length" class="ta-empty">
             <i class="pi pi-wave-pulse ta-empty-icon" />
             <p class="ta-empty-title">Sin variables seleccionadas</p>
             <p class="ta-empty-sub">
-                Haga doble clic en un tag del árbol de proceso para agregar una tendencia
+                Doble clic en un tag de proceso, o arrastra una métrica de
+                Producción / Compras / Ventas desde el árbol de operaciones
             </p>
         </div>
 
@@ -258,6 +282,76 @@ watch(() => props.range, () => { rsValue.value = null; });
                 </DxDataGrid>
             </div>
         </template>
+
+        <!-- ══════════════════════════════════════════════════════════════
+             PANEL DE MÉTRICAS OPERATIVAS (Producción / Compras / Ventas)
+        ══════════════════════════════════════════════════════════════ -->
+        <template v-if="props.operMetrics.length">
+
+            <!-- Cabecera del panel ─────────────────────────────────────── -->
+            <div class="ta-oper-header">
+                <i class="pi pi-chart-bar" />
+                <span>Métricas Operativas</span>
+                <span class="ta-oper-count">{{ props.operMetrics.length }}</span>
+                <!-- Chips de métricas activas -->
+                <div class="ta-oper-chips">
+                    <span v-for="m in props.operMetrics" :key="m.key"
+                          class="ta-oper-chip"
+                          :style="`border-color:${operColor(m)};color:${operColor(m)}`">
+                        {{ m.label }}
+                        <span v-if="m.unidad" class="ta-oper-chip-unit">{{ m.unidad }}</span>
+                        <button class="ta-oper-chip-del" @click="emit('remove-metric', m.key)">×</button>
+                    </span>
+                </div>
+            </div>
+
+            <!-- Chart de operaciones ─────────────────────────────────── -->
+            <div class="ta-oper-chart">
+                <DxChart
+                    :data-source="operChartData"
+                    argument-field="time"
+                    style="height:100%;width:100%"
+                >
+                    <DxCommonSeriesSettings type="spline" :width="2" />
+
+                    <DxSeries
+                        v-for="m in props.operMetrics"
+                        :key="m.key"
+                        :value-field="m.key"
+                        :name="m.label"
+                        :axis="m.key"
+                        :color="operColor(m)"
+                    />
+
+                    <DxValueAxis
+                        v-for="m in props.operMetrics"
+                        :key="`oax-${m.key}`"
+                        :name="m.key"
+                        :position="props.operMetrics.indexOf(m) % 2 === 0 ? 'left' : 'right'"
+                        :color="operColor(m)"
+                        :tick="{ color: operColor(m) }"
+                        :label="{ font: { size: 10, color: operColor(m) } }"
+                        :title="{ text: m.unidad, font: { size: 9 } }"
+                        :show-zero="false"
+                    />
+
+                    <DxArgumentAxis
+                        argument-type="string"
+                        :label="{ font: { size: 10 } }"
+                    />
+
+                    <DxCrosshair :enabled="true" color="#888" :width="1" dash-style="dash">
+                        <DxHorizontalLine :visible="false" />
+                    </DxCrosshair>
+
+                    <DxTooltip :enabled="true" :shared="true" location="edge" z-index="9999" />
+                    <DxLegend vertical-alignment="top" horizontal-alignment="right" :font="{ size: 11 }" />
+                    <DxExport :enabled="true" />
+                </DxChart>
+            </div>
+
+        </template>
+
     </div>
 </template>
 
@@ -292,4 +386,37 @@ watch(() => props.range, () => { rsValue.value = null; });
 }
 .ta-qual-ok    { background: #dcfce7; color: #15803d; }
 .ta-qual-alarm { background: #fee2e2; color: #b91c1c; }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   PANEL DE MÉTRICAS OPERATIVAS
+   ══════════════════════════════════════════════════════════════════════════════ */
+.ta-oper-header {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    padding: 4px 10px; border-top: 2px solid var(--p-primary-color);
+    background: var(--p-surface-100); font-size: 0.72rem; font-weight: 700;
+    color: var(--p-primary-color);
+}
+.ta-oper-count {
+    background: var(--p-primary-color); color: #fff;
+    border-radius: 10px; font-size: 0.6rem; padding: 1px 6px;
+}
+.ta-oper-chips { display: flex; gap: 5px; flex-wrap: wrap; margin-left: 4px; }
+
+.ta-oper-chip {
+    display: flex; align-items: center; gap: 4px;
+    border: 1px solid; border-radius: 12px;
+    padding: 1px 8px; font-size: 0.67rem; font-weight: 600;
+    background: var(--p-surface-0);
+}
+.ta-oper-chip-unit {
+    background: var(--p-surface-200); border-radius: 4px;
+    padding: 0 4px; font-size: 0.6rem; color: var(--p-text-muted-color);
+}
+.ta-oper-chip-del {
+    background: none; border: none; cursor: pointer;
+    font-size: 0.9rem; line-height: 1; color: inherit; opacity: 0.6; padding: 0;
+}
+.ta-oper-chip-del:hover { opacity: 1; }
+
+.ta-oper-chart { height: 220px; border-top: 1px solid var(--p-surface-200); }
 </style>

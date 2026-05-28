@@ -80,6 +80,35 @@ namespace anDora.Api.Models
         [BsonElement("data")]
         [JsonPropertyName("data")]
         public HistorianTagData? Data { get; set; }
+
+        // Presente sólo cuando type == "operacion"
+        [BsonElement("operData")]
+        [JsonPropertyName("operData")]
+        public HistorianOperData? OperData { get; set; }
+    }
+
+    [BsonIgnoreExtraElements]
+    public class HistorianOperData
+    {
+        [BsonElement("source")]
+        [JsonPropertyName("source")]
+        public string Source { get; set; } = string.Empty;   // "produccion" | "precios"
+
+        [BsonElement("planta_id")]
+        [JsonPropertyName("planta_id")]
+        public string? PlantaId { get; set; }
+
+        [BsonElement("nombre")]
+        [JsonPropertyName("nombre")]
+        public string? Nombre { get; set; }
+
+        [BsonElement("metrica")]
+        [JsonPropertyName("metrica")]
+        public string Metrica { get; set; } = string.Empty;  // "cantidad" | "precio_neto_mxn" | etc.
+
+        [BsonElement("unidad")]
+        [JsonPropertyName("unidad")]
+        public string Unidad { get; set; } = string.Empty;
     }
 
     [BsonIgnoreExtraElements]
