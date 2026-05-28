@@ -51,7 +51,7 @@ function onSearch() {
         <!-- Cabecera dock ───────────────────────────────────────────────── -->
         <div class="pdock-header">
             <i class="pi pi-sitemap" />
-            <span>Árbol de Proceso</span>
+            <span>Salvo</span>
         </div>
 
         <!-- Tabs: Tags | Ops | Activos ─────────────────────────────────── -->
