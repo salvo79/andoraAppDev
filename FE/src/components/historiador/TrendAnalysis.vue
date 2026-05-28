@@ -27,7 +27,7 @@ import {
     DxDataGrid,
     DxScrolling,
 } from 'devextreme-vue/data-grid';
-import { computed, ref, watch } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 const props = defineProps({
@@ -39,8 +39,16 @@ const props = defineProps({
 const emit = defineEmits(['remove-tag', 'remove-metric']);
 
 // ── Refs ──────────────────────────────────────────────────────────────────────
-const chartRef = ref(null);
-const rsValue  = ref(null); // rango del range selector
+const chartRef    = ref(null);
+const rsValue     = ref(null); // rango del range selector
+const gridVisible = ref(true);
+
+function toggleGrid() {
+    gridVisible.value = !gridVisible.value;
+    nextTick(() => setTimeout(() => {
+        try { chartRef.value?.instance?.render?.(); } catch {}
+    }, 50));
+}
 
 // ── Datos del chart (formato columnar) ───────────────────────────────────────
 const allTags = computed(() => [...props.tags, ...props.calcVars]);
@@ -245,8 +253,18 @@ function operColor(m) {
                 </DxRangeSelector>
             </div>
 
+            <!-- ── SPLITTER ──────────────────────────────────────────────── -->
+            <div class="ta-splitter" @click="toggleGrid"
+                 :title="gridVisible ? 'Ocultar tabla' : 'Mostrar tabla'">
+                <div class="ta-splitter-line" />
+                <div class="ta-splitter-btn">
+                    <i class="pi" :class="gridVisible ? 'pi-chevron-down' : 'pi-chevron-up'" />
+                </div>
+                <div class="ta-splitter-line" />
+            </div>
+
             <!-- ── TABLA DE VARIABLES (DxDataGrid) ──────────────────────── -->
-            <div class="ta-grid">
+            <div v-show="gridVisible" class="ta-grid">
                 <DxDataGrid
                     :data-source="gridData"
                     :show-borders="false"
@@ -369,8 +387,32 @@ function operColor(m) {
 
 /* ── Secciones ─────────────────────────────────────────────────────────────── */
 .ta-chart-area { flex: 1; min-height: 0; overflow: hidden; }
-.ta-range      { height: 74px; border-top: 1px solid var(--p-surface-200); }
-.ta-grid       { height: 130px; border-top: 1px solid var(--p-surface-200); overflow: hidden; }
+.ta-range      { height: 74px; border-top: 1px solid var(--p-surface-200); flex-shrink: 0; }
+.ta-grid       { height: 130px; overflow: hidden; flex-shrink: 0; }
+
+/* ── Splitter ──────────────────────────────────────────────────────────────── */
+.ta-splitter {
+    display: flex; align-items: center; gap: 8px;
+    height: 16px; padding: 0 10px; flex-shrink: 0;
+    background: var(--p-surface-50);
+    border-top: 1px solid var(--p-surface-200);
+    cursor: pointer; user-select: none;
+    transition: background 0.15s;
+}
+.ta-splitter:hover { background: var(--p-surface-100); }
+.ta-splitter-line {
+    flex: 1; height: 1px; background: var(--p-surface-300);
+}
+.ta-splitter-btn {
+    display: flex; align-items: center; justify-content: center;
+    width: 22px; height: 12px; border-radius: 3px;
+    background: var(--p-surface-200);
+    font-size: 0.55rem; color: var(--p-text-muted-color);
+    transition: background 0.15s, color 0.15s;
+}
+.ta-splitter:hover .ta-splitter-btn {
+    background: var(--p-primary-color); color: #fff;
+}
 
 /* ── Celdas de la tabla ────────────────────────────────────────────────────── */
 .ta-dot {
