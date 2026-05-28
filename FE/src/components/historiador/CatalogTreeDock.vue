@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted } from 'vue';
-import { DxTreeView } from 'devextreme-vue/tree-view';
+import SimpleTree from '@/components/shared/SimpleTree.vue';
 import api from '@/service/api';
 import { useGlobalVarsStore } from '@/stores/GlobalVars';
 
@@ -10,17 +10,16 @@ const treeData  = ref([]);
 const loading   = ref(true);
 const error     = ref(false);
 const search    = ref('');
-const treeRef   = ref(null);
 
 // ── Icon map per node type ────────────────────────────────────────────────────
 const NODE_ICONS = {
-    company:        { icon: 'pi pi-building',      cls: 'node-company'  },
-    sitio:          { icon: 'pi pi-map-marker',     cls: 'node-sitio'   },
-    planta:         { icon: 'pi pi-cog',            cls: 'node-planta'  },
-    tanque:         { icon: 'pi pi-database',       cls: 'node-tanque'  },
-    corriente:      { icon: 'pi pi-arrows-h',       cls: 'node-corriente' },
-    'corriente-tipo': { icon: 'pi pi-tag',          cls: 'node-ctype'   },
-    seccion:        { icon: 'pi pi-th-large',       cls: 'node-seccion' },
+    company:          { icon: 'pi pi-building',  cls: 'node-company'   },
+    sitio:            { icon: 'pi pi-map-marker', cls: 'node-sitio'    },
+    planta:           { icon: 'pi pi-cog',        cls: 'node-planta'   },
+    tanque:           { icon: 'pi pi-database',   cls: 'node-tanque'   },
+    corriente:        { icon: 'pi pi-arrows-h',   cls: 'node-corriente'},
+    'corriente-tipo': { icon: 'pi pi-tag',        cls: 'node-ctype'    },
+    seccion:          { icon: 'pi pi-th-large',   cls: 'node-seccion'  },
 };
 
 function nodeIcon(item) {
@@ -48,10 +47,6 @@ async function loadTree() {
 }
 
 onMounted(loadTree);
-
-function onSearch() {
-    treeRef.value?.instance.option('searchValue', search.value);
-}
 </script>
 
 <template>
@@ -59,12 +54,11 @@ function onSearch() {
 
         <!-- Search ──────────────────────────────────────────────────────────── -->
         <div class="ctd-search">
-            <span class="dx-icon-search ctd-search-icon" />
+            <i class="pi pi-search ctd-search-icon" />
             <input
                 v-model="search"
                 class="ctd-search-input"
                 placeholder="Buscar activo..."
-                @input="onSearch"
             />
         </div>
 
@@ -83,26 +77,16 @@ function onSearch() {
 
         <!-- Tree ────────────────────────────────────────────────────────────── -->
         <div v-else class="ctd-tree flex-1 overflow-auto">
-            <DxTreeView
-                ref="treeRef"
-                :items="treeData"
-                key-expr="id"
-                display-expr="text"
-                items-expr="items"
-                :search-enabled="false"
-                :expand-all-enabled="false"
-                selection-mode="single"
-                width="100%"
-            >
-                <template #item="{ data: item }">
-                    <div class="ct-node" :class="item.type">
-                        <i :class="[nodeIcon(item).icon, nodeIcon(item).cls, 'ct-icon']" />
-                        <span class="ct-label">{{ item.text }}</span>
-                        <span v-if="item.tipoProducto" class="ct-badge">{{ item.tipoProducto }}</span>
-                        <span v-else-if="item.unidad" class="ct-badge">{{ item.unidad }}</span>
+            <SimpleTree :nodes="treeData" :search-text="search">
+                <template #default="{ node }">
+                    <div class="ct-node" :class="node.type">
+                        <i :class="[nodeIcon(node).icon, nodeIcon(node).cls, 'ct-icon']" />
+                        <span class="ct-label">{{ node.text }}</span>
+                        <span v-if="node.tipoProducto" class="ct-badge">{{ node.tipoProducto }}</span>
+                        <span v-else-if="node.unidad"  class="ct-badge">{{ node.unidad }}</span>
                     </div>
                 </template>
-            </DxTreeView>
+            </SimpleTree>
         </div>
 
         <!-- Legend ──────────────────────────────────────────────────────────── -->
@@ -134,11 +118,9 @@ function onSearch() {
 }
 .ctd-search-input {
     width: 100%; padding: 3px 6px 3px 24px;
-    border: 1px solid var(--p-surface-300);
-    border-radius: 3px;
+    border: 1px solid var(--p-surface-300); border-radius: 3px;
     font-size: 0.75rem; background: var(--p-surface-0);
-    color: var(--p-text-color); outline: none;
-    box-sizing: border-box;
+    color: var(--p-text-color); outline: none; box-sizing: border-box;
 }
 .ctd-search-input:focus { border-color: var(--p-primary-color); }
 
@@ -157,21 +139,17 @@ function onSearch() {
 
 /* Tree */
 .ctd-tree { overflow-y: auto; }
-.ctd-tree :deep(.dx-treeview-item) { padding: 1px 4px !important; }
-.ctd-tree :deep(.dx-treeview-item-content) { padding: 0 !important; }
-.ctd-tree :deep(.dx-treeview-node) { padding-left: 12px !important; }
 
 /* Node */
 .ct-node {
     display: flex; align-items: center; gap: 5px;
-    padding: 2px 0; font-size: 0.76rem; cursor: default;
+    padding: 2px 0; font-size: 0.76rem;
 }
-.ct-icon { font-size: 0.78rem; flex-shrink: 0; }
+.ct-icon  { font-size: 0.78rem; flex-shrink: 0; }
 .ct-label { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ct-badge {
     font-size: 0.6rem; color: var(--p-text-muted-color);
-    background: var(--p-surface-200); border-radius: 3px;
-    padding: 0 4px; flex-shrink: 0;
+    background: var(--p-surface-200); border-radius: 3px; padding: 0 4px; flex-shrink: 0;
 }
 
 /* Node type colors */
@@ -181,17 +159,15 @@ function onSearch() {
 .node-tanque   { color: #10b981; }
 .node-corriente { color: #f59e0b; }
 .node-ctype    { color: var(--p-text-muted-color); }
-.node-seccion  { color: var(--p-text-muted-color); font-weight: 700; }
+.node-seccion  { color: var(--p-text-muted-color); }
 
-/* Bold for structural nodes */
 .ct-node.company .ct-label  { font-weight: 800; }
 .ct-node.sitio .ct-label    { font-weight: 700; }
 .ct-node.seccion .ct-label  { font-weight: 700; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; }
 
 /* Legend */
 .ctd-legend {
-    padding: 5px 10px;
-    border-top: 1px solid var(--p-surface-200);
+    padding: 5px 10px; border-top: 1px solid var(--p-surface-200);
     font-size: 0.65rem; color: var(--p-text-muted-color);
     background: var(--p-surface-100);
 }
