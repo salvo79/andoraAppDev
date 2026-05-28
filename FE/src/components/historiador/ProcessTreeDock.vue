@@ -48,27 +48,7 @@ function onSearch() {
 <template>
     <div class="pdock flex flex-column h-full">
 
-        <!-- Cabecera dock ───────────────────────────────────────────────── -->
-        <div class="pdock-header">
-            <i class="pi pi-sitemap" />
-            <span>Salvo</span>
-        </div>
 
-        <!-- Tabs: Tags | Ops | Activos ─────────────────────────────────── -->
-        <div class="pdock-tabs">
-            <button class="pdock-tab" :class="{ 'pdock-tab-active': activeTab === 'tags' }"
-                    @click="activeTab = 'tags'">
-                <i class="pi pi-microchip" /> Tags
-            </button>
-            <button class="pdock-tab" :class="{ 'pdock-tab-active': activeTab === 'operaciones' }"
-                    @click="activeTab = 'operaciones'">
-                <i class="pi pi-chart-bar" /> Ops
-            </button>
-            <button class="pdock-tab" :class="{ 'pdock-tab-active': activeTab === 'activos' }"
-                    @click="activeTab = 'activos'">
-                <i class="pi pi-building" /> Activos
-            </button>
-        </div>
 
         <!-- ── TAB: Tags ─────────────────────────────────────────────── -->
         <template v-if="activeTab === 'tags'">
