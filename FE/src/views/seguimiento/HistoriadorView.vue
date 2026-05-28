@@ -2,12 +2,41 @@
 import ProcessTreeDock  from '@/components/historiador/ProcessTreeDock.vue';
 import TrendAnalysis    from '@/components/historiador/TrendAnalysis.vue';
 import VarBuilderDock   from '@/components/historiador/VarBuilderDock.vue';
-import { computed, ref, watch, onMounted } from 'vue';
+import { computed, ref, watch, onMounted, onUnmounted } from 'vue';
 import { useAuthStore }    from '@/stores/authStore.js';
 import historianService    from '@/service/historianService.js';
 import { operationsService } from '@/service/operationsService.js';
+import api                 from '@/service/api.js';
 
 const authStore = useAuthStore();
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ATLAS CONNECTION STATUS
+// ══════════════════════════════════════════════════════════════════════════════
+const atlasStatus = ref('connecting'); // 'connecting' | 'connected' | 'error'
+let atlasTimer = null;
+
+async function checkAtlas(initial = false) {
+    if (initial) atlasStatus.value = 'connecting';
+    try {
+        await api.get('/health/atlas', { timeout: 6000 });
+        atlasStatus.value = 'connected';
+    } catch {
+        atlasStatus.value = 'error';
+    }
+}
+
+const atlasLabel = computed(() => ({
+    connecting: 'Conectando...',
+    connected:  'andoraDB · Atlas',
+    error:      'andoraDB · Sin conexión',
+}[atlasStatus.value]));
+
+const atlasIcon = computed(() => ({
+    connecting: 'pi pi-spin pi-spinner',
+    connected:  'pi pi-database',
+    error:      'pi pi-times-circle',
+}[atlasStatus.value]));
 
 // ══════════════════════════════════════════════════════════════════════════════
 // DOCKS
@@ -262,6 +291,14 @@ onMounted(async () => {
     try { library.value = await historianService.getAll(); }
     catch { /* no critico */ }
     finally { libLoading.value = false; }
+
+    // Verifica conexión a Atlas al montar y luego cada 30 segundos
+    checkAtlas(true);
+    atlasTimer = setInterval(() => checkAtlas(), 30_000);
+});
+
+onUnmounted(() => {
+    clearInterval(atlasTimer);
 });
 
 function openFromLibrary(saved) {
@@ -584,7 +621,11 @@ function fmtDate(d) {
              STATUS BAR
         ════════════════════════════════════════════════════════════════ -->
         <div class="vs-statusbar">
-            <span><i class="pi pi-database" /> andoraDB · Atlas</span>
+            <span class="vs-atlas-badge" :class="`vs-atlas-${atlasStatus}`">
+                <span class="vs-atlas-dot" />
+                <i :class="atlasIcon" />
+                {{ atlasLabel }}
+            </span>
             <span class="vs-stbar-sep" />
             <span><i class="pi pi-tag" /> Tags: {{ activeTagCount }}/8</span>
             <span class="vs-stbar-sep" />
@@ -1025,6 +1066,53 @@ function fmtDate(d) {
 }
 .vs-stbar-sep   { width: 1px; height: 10px; background: rgba(255,255,255,0.3); }
 .vs-stbar-right { margin-left: auto; opacity: 0.7; }
+
+/* ── Atlas status badge ────────────────────────────────────────────────────── */
+.vs-atlas-badge {
+    display: flex; align-items: center; gap: 5px;
+    padding: 1px 8px; border-radius: 10px;
+    font-size: 0.65rem; font-weight: 600;
+    transition: background 0.4s, color 0.4s;
+}
+.vs-atlas-dot {
+    width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+    transition: background 0.4s;
+}
+
+/* Verde — conectado */
+.vs-atlas-connected {
+    background: rgba(34, 197, 94, 0.18);
+    color: #86efac;
+}
+.vs-atlas-connected .vs-atlas-dot {
+    background: #22c55e;
+    box-shadow: 0 0 5px #22c55e;
+}
+
+/* Naranja — conectando */
+.vs-atlas-connecting {
+    background: rgba(251, 146, 60, 0.18);
+    color: #fdba74;
+}
+.vs-atlas-connecting .vs-atlas-dot {
+    background: #f97316;
+    animation: atlas-pulse 1s ease-in-out infinite;
+}
+
+/* Rojo — sin conexión */
+.vs-atlas-error {
+    background: rgba(239, 68, 68, 0.18);
+    color: #fca5a5;
+}
+.vs-atlas-error .vs-atlas-dot {
+    background: #ef4444;
+    box-shadow: 0 0 5px #ef4444;
+}
+
+@keyframes atlas-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%       { opacity: 0.4; transform: scale(0.75); }
+}
 
 /* ══════════════════════════════════════════════════════════════════════════════
    OVERLAY & DIALOGS
