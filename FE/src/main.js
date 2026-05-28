@@ -16,6 +16,21 @@ import ToastService from 'primevue/toastservice'
 import '@/assets/tailwind.css'
 import '@/assets/styles.scss'
 
+// DevExpress
+//import config from 'devextreme/core/config'
+//import { licenseKey } from '../devextreme-license2.js'
+//config({ licenseKey })
+import config from 'devextreme/core/config'
+config({ licenseKey: import.meta.env.VITE_DEVEXTREME_LICENSE })
+
+
+
+import 'devextreme/dist/css/dx.light.css'
+import 'devexpress-dashboard/dist/css/dx-dashboard.light.css'
+import '@devexpress/analytics-core/dist/css/dx-analytics.common.css'
+import '@devexpress/analytics-core/dist/css/dx-analytics.light.css'
+import 'devexpress-richedit/dist/dx.richedit.css'
+
 // Auth Store
 import { useAuthStore } from '@/stores/authStore'
 

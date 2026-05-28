@@ -1,27 +1,28 @@
 <script setup>
 import { PROCESS_TREE_DX } from '@/service/seguimientoService';
 import OperationsTreeDock from '@/components/historiador/OperationsTreeDock.vue';
-import CatalogTreeDock    from '@/components/historiador/CatalogTreeDock.vue';
-import SimpleTree         from '@/components/shared/SimpleTree.vue';
+import CatalogTreeDock from '@/components/historiador/CatalogTreeDock.vue';
+import { DxTreeView } from 'devextreme-vue/tree-view';
 import { ref } from 'vue';
 
 const emit = defineEmits(['add-tag', 'add-metric']);
 
-const activeTab = ref('tags'); // 'tags' | 'operaciones' | 'activos'
+const activeTab = ref('tags'); // 'tags' | 'operaciones'
 
-const search = ref('');
+const treeRef = ref(null);
+const search  = ref('');
 
 // ── Iconos por tipo de nodo ───────────────────────────────────────────────────
 const NODE_ICONS = {
-    sitio:  { icon: 'pi pi-map-marker', cls: 'node-sitio'  },
-    planta: { icon: 'pi pi-building',   cls: 'node-planta' },
-    area:   { icon: 'pi pi-sitemap',    cls: 'node-area'   },
-    tag: {
-        T: { icon: 'pi pi-sun',         cls: 'node-tag-t' },
-        P: { icon: 'pi pi-gauge',       cls: 'node-tag-p' },
-        F: { icon: 'pi pi-arrow-right', cls: 'node-tag-f' },
-        L: { icon: 'pi pi-wave-pulse',  cls: 'node-tag-l' },
-        A: { icon: 'pi pi-chart-line',  cls: 'node-tag-a' },
+    sitio:  { icon: 'pi pi-map-marker',            cls: 'node-sitio'  },
+    planta: { icon: 'pi pi-building',              cls: 'node-planta' },
+    area:   { icon: 'pi pi-sitemap',               cls: 'node-area'   },
+    tag:    {
+        T: { icon: 'pi pi-sun',                   cls: 'node-tag-t'  },
+        P: { icon: 'pi pi-gauge',                 cls: 'node-tag-p'  },
+        F: { icon: 'pi pi-arrow-right',           cls: 'node-tag-f'  },
+        L: { icon: 'pi pi-wave-pulse',            cls: 'node-tag-l'  },
+        A: { icon: 'pi pi-chart-line',            cls: 'node-tag-a'  },
     },
 };
 
@@ -31,10 +32,16 @@ function nodeIcon(item) {
 }
 
 // ── Doble clic → agregar tag ──────────────────────────────────────────────────
-function onNodeDblClick(node) {
-    if (node.type === 'tag' && node.tagData) {
-        emit('add-tag', { key: node.id, ...node.tagData });
+function onItemDblClick(e) {
+    const item = e.itemData;
+    if (item.type === 'tag' && item.tagData) {
+        emit('add-tag', { key: item.id, ...item.tagData });
     }
+}
+
+// ── Búsqueda en árbol ─────────────────────────────────────────────────────────
+function onSearch() {
+    treeRef.value?.instance.option('searchValue', search.value);
 }
 </script>
 
@@ -68,11 +75,12 @@ function onNodeDblClick(node) {
 
         <!-- Búsqueda ────────────────────────────────────────────────────── -->
         <div class="pdock-search">
-            <i class="pi pi-search pdock-search-icon" />
+            <span class="dx-icon-search pdock-search-icon" />
             <input
                 v-model="search"
                 class="pdock-search-input"
                 placeholder="Buscar tag..."
+                @input="onSearch"
             />
         </div>
 
@@ -82,22 +90,27 @@ function onNodeDblClick(node) {
             Doble clic para agregar al análisis
         </div>
 
-        <!-- Árbol ───────────────────────────────────────────────────────── -->
+        <!-- DxTreeView ──────────────────────────────────────────────────── -->
         <div class="pdock-tree flex-1 overflow-auto">
-            <SimpleTree
-                :nodes="PROCESS_TREE_DX"
-                :search-text="search"
-                @node-dblclick="onNodeDblClick"
+            <DxTreeView
+                ref="treeRef"
+                :items="PROCESS_TREE_DX"
+                :search-enabled="false"
+                :expand-all-enabled="false"
+                selection-mode="single"
+                item-alt-text="label"
+                width="100%"
+                @item-dbl-click="onItemDblClick"
             >
-                <template #default="{ node }">
-                    <div class="tree-node" :class="node.type">
-                        <i :class="[nodeIcon(node).icon, nodeIcon(node).cls, 'tree-icon']" />
-                        <span class="tree-label">{{ node.text }}</span>
-                        <span v-if="node.type === 'tag' && node.tagData"
-                              class="tree-unit">{{ node.tagData.unidad }}</span>
+                <template #item="{ data: item }">
+                    <div class="tree-node" :class="item.type">
+                        <i :class="[nodeIcon(item).icon, nodeIcon(item).cls, 'tree-icon']" />
+                        <span class="tree-label">{{ item.text }}</span>
+                        <span v-if="item.type === 'tag' && item.tagData"
+                              class="tree-unit">{{ item.tagData.unidad }}</span>
                     </div>
                 </template>
-            </SimpleTree>
+            </DxTreeView>
         </div>
 
         <!-- Leyenda de tipos ────────────────────────────────────────────── -->
@@ -179,7 +192,6 @@ function onNodeDblClick(node) {
     border-radius: 3px;
     font-size: 0.75rem; background: var(--p-surface-0);
     color: var(--p-text-color); outline: none;
-    box-sizing: border-box;
 }
 .pdock-search-input:focus { border-color: var(--p-primary-color); }
 
@@ -193,17 +205,22 @@ function onNodeDblClick(node) {
 /* ── Árbol ─────────────────────────────────────────────────────────────────── */
 .pdock-tree { overflow-y: auto; }
 
+/* Override DxTreeView internal styles */
+.pdock-tree :deep(.dx-treeview-item) { padding: 1px 4px !important; }
+.pdock-tree :deep(.dx-treeview-item-content) { padding: 0 !important; }
+.pdock-tree :deep(.dx-treeview-node) { padding-left: 12px !important; }
+
 /* ── Nodo del árbol ────────────────────────────────────────────────────────── */
 .tree-node {
     display: flex; align-items: center; gap: 5px;
-    padding: 2px 0; font-size: 0.76rem;
+    padding: 2px 0; cursor: default; font-size: 0.76rem;
 }
 .tree-node.tag { cursor: pointer; }
 .tree-node.tag:hover { color: var(--p-primary-color); }
 
-.tree-icon  { font-size: 0.78rem; flex-shrink: 0; }
+.tree-icon { font-size: 0.78rem; flex-shrink: 0; }
 .tree-label { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.tree-unit  {
+.tree-unit {
     font-size: 0.62rem; color: var(--p-text-muted-color);
     background: var(--p-surface-200); border-radius: 3px;
     padding: 0 4px; flex-shrink: 0;
@@ -213,11 +230,11 @@ function onNodeDblClick(node) {
 .node-sitio  { color: var(--p-primary-color); font-weight: 700; }
 .node-planta { color: var(--p-primary-color); }
 .node-area   { color: var(--p-text-muted-color); }
-.node-tag-t  { color: #f59e0b; }
-.node-tag-p  { color: #3b82f6; }
-.node-tag-f  { color: #06b6d4; }
-.node-tag-l  { color: #8b5cf6; }
-.node-tag-a  { color: #10b981; }
+.node-tag-t  { color: #f59e0b; }   /* temperatura */
+.node-tag-p  { color: #3b82f6; }   /* presión */
+.node-tag-f  { color: #06b6d4; }   /* flujo */
+.node-tag-l  { color: #8b5cf6; }   /* nivel */
+.node-tag-a  { color: #10b981; }   /* analítico */
 
 /* ── Leyenda ───────────────────────────────────────────────────────────────── */
 .pdock-legend {
