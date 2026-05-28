@@ -137,6 +137,7 @@ if (app.Environment.IsDevelopment())
     });
 }
 
+app.UseRouting();
 app.UseCors("AllowFrontend");
 
 var wwwrootPath = Path.Combine(app.Environment.ContentRootPath, "wwwroot");
