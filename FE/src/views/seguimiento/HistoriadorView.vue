@@ -42,7 +42,7 @@ const atlasIcon = computed(() => ({
 // DOCKS
 // ══════════════════════════════════════════════════════════════════════════════
 const leftOpen  = ref(true);
-const rightOpen = ref(true);
+const rightOpen = ref(false);
 const LEFT_W    = 240;
 const RIGHT_W   = 270;
 
