@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue';
+const baseUrl = import.meta.env.BASE_URL;
 import { useRoute, useRouter } from 'vue-router';
 
 const router = useRouter();
@@ -246,7 +247,7 @@ const getAvatarInitials = (name) => {
             <div class="bg-surface-0 dark:bg-surface-800 border border-surface-200 dark:border-surface-700 rounded-lg shadow-sm">
                 <div class="p-3 md:p-4 border-b border-surface-200 dark:border-surface-700 flex items-center justify-between">
                     <div class="flex items-center gap-2 md:gap-3 min-w-0">
-                        <Avatar :image="'/demo/images/avatar/avatar-square-m-2.jpg'" size="normal" shape="square" class="w-6 h-6 md:w-8 md:h-8 shrink-0 rounded-lg!" :pt="{ image: { class: 'rounded-lg!' } }" />
+                        <Avatar :image="`${baseUrl}demo/images/avatar/avatar-square-m-2.jpg`" size="normal" shape="square" class="w-6 h-6 md:w-8 md:h-8 shrink-0 rounded-lg!" :pt="{ image: { class: 'rounded-lg!' } }" />
                         <div class="min-w-0">
                             <div class="text-surface-900 dark:text-surface-0 font-medium text-sm md:text-base">Robert Fox</div>
                             <div class="text-xs md:text-sm text-surface-500 dark:text-surface-400 truncate">to {{ currentEmail?.sender }}</div>

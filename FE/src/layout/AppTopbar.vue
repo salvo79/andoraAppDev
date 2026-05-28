@@ -8,6 +8,7 @@ const router = useRouter();
 const auth = useAuthStore();
 const { layoutState, toggleMenu, toggleConfigSidebar } = useLayout();
 const baseUrl = import.meta.env.BASE_URL;
+const asset = (path) => `${baseUrl}${path.replace(/^\//, '')}`;
 
 
 function logout() {
@@ -38,7 +39,7 @@ const notifications = [
         id: 'inbox',
         data: [
             {
-                image: '/demo/images/avatar/avatar-square-m-2.jpg',
+                image: asset('/demo/images/avatar/avatar-square-m-2.jpg'),
                 name: 'Michael Lee',
                 description: 'You have a new message from the support team regarding your recent inquiry.',
                 time: '1 hour ago',
@@ -49,14 +50,14 @@ const notifications = [
                 read: false
             },
             {
-                image: '/demo/images/avatar/avatar-square-f-1.jpg',
+                image: asset('/demo/images/avatar/avatar-square-f-1.jpg'),
                 name: 'Alice Johnson',
                 description: 'Your report has been successfully submitted and is under review.',
                 time: '10 minutes ago',
                 read: true
             },
             {
-                image: '/demo/images/avatar/avatar-square-f-2.jpg',
+                image: asset('/demo/images/avatar/avatar-square-f-2.jpg'),
                 name: 'Emily Davis',
                 description: 'The project deadline has been updated to September 30th. Please check the details.',
                 time: 'Yesterday at 4:35 PM',
@@ -68,14 +69,14 @@ const notifications = [
         id: 'general',
         data: [
             {
-                image: '/demo/images/avatar/avatar-square-f-1.jpg',
+                image: asset('/demo/images/avatar/avatar-square-f-1.jpg'),
                 name: 'Alice Johnson',
                 description: 'Reminder: Your subscription is about to expire in 3 days. Renew now to avoid interruption.',
                 time: '30 minutes ago',
                 read: true
             },
             {
-                image: '/demo/images/avatar/avatar-square-m-2.jpg',
+                image: asset('/demo/images/avatar/avatar-square-m-2.jpg'),
                 name: 'Michael Lee',
                 description: 'The server maintenance has been completed successfully. No further downtime is expected.',
                 time: 'Yesterday at 2:15 PM',
@@ -87,14 +88,14 @@ const notifications = [
         id: 'archived',
         data: [
             {
-                image: '/demo/images/avatar/avatar-square-m-1.jpg',
+                image: asset('/demo/images/avatar/avatar-square-m-1.jpg'),
                 name: 'Lucas Brown',
                 description: 'Your appointment with Dr. Anderson has been confirmed for October 12th at 10:00 AM.',
                 time: '1 week ago',
                 read: false
             },
             {
-                image: '/demo/images/avatar/avatar-square-f-2.jpg',
+                image: asset('/demo/images/avatar/avatar-square-f-2.jpg'),
                 name: 'Emily Davis',
                 description: 'The document you uploaded has been successfully archived for future reference.',
                 time: '2 weeks ago',
