@@ -1,7 +1,6 @@
 <script setup>
 import { PROCESS_TREE_DX } from '@/service/seguimientoService';
 import OperationsTreeDock from '@/components/historiador/OperationsTreeDock.vue';
-import CatalogTreeDock from '@/components/historiador/CatalogTreeDock.vue';
 import { DxTreeView } from 'devextreme-vue/tree-view';
 import { ref } from 'vue';
 
@@ -48,7 +47,23 @@ function onSearch() {
 <template>
     <div class="pdock flex flex-column h-full">
 
+        <!-- Cabecera dock ───────────────────────────────────────────────── -->
+        <div class="pdock-header">
+            <i class="pi pi-sitemap" />
+            <span>Árbol de Proceso</span>
+        </div>
 
+        <!-- Tabs: Tags | Operaciones ──────────────────────────────────── -->
+        <div class="pdock-tabs">
+            <button class="pdock-tab" :class="{ 'pdock-tab-active': activeTab === 'tags' }"
+                    @click="activeTab = 'tags'">
+                <i class="pi pi-microchip" /> Tags
+            </button>
+            <button class="pdock-tab" :class="{ 'pdock-tab-active': activeTab === 'operaciones' }"
+                    @click="activeTab = 'operaciones'">
+                <i class="pi pi-chart-bar" /> Operaciones
+            </button>
+        </div>
 
         <!-- ── TAB: Tags ─────────────────────────────────────────────── -->
         <template v-if="activeTab === 'tags'">
@@ -109,19 +124,11 @@ function onSearch() {
         </template><!-- /TAB Tags -->
 
         <!-- ── TAB: Operaciones ──────────────────────────────────────── -->
-        <template v-else-if="activeTab === 'operaciones'">
+        <template v-else>
             <OperationsTreeDock
                 class="flex-1 min-h-0"
                 style="overflow:hidden;display:flex;flex-direction:column"
                 @add-metric="m => emit('add-metric', m)"
-            />
-        </template>
-
-        <!-- ── TAB: Activos ──────────────────────────────────────────── -->
-        <template v-else-if="activeTab === 'activos'">
-            <CatalogTreeDock
-                class="flex-1 min-h-0"
-                style="overflow:hidden;display:flex;flex-direction:column"
             />
         </template>
 
