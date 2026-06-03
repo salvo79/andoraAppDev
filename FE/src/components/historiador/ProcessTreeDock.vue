@@ -1,12 +1,9 @@
 <script setup>
 import { PROCESS_TREE_LIST } from '@/service/seguimientoService';
-import OperationsTreeDock from '@/components/historiador/OperationsTreeDock.vue';
-import { DxTreeList, DxColumn, DxSearchPanel } from 'devextreme-vue/tree-list';
+import { DxTreeList, DxColumn } from 'devextreme-vue/tree-list';
 import { ref, computed } from 'vue';
 
-const emit = defineEmits(['add-tag', 'add-metric']);
-
-const activeTab = ref('tags');
+const emit = defineEmits(['add-tag']);
 
 const search = ref('');
 
@@ -61,12 +58,6 @@ function onRowDblClick(e) {
 
 <template>
     <div class="pdock flex flex-column h-full">
-
-
-
-
-        <!-- ── TAB: Tags ─────────────────────────────────────────────── -->
-        <template v-if="activeTab === 'tags'">
 
         <!-- Búsqueda ────────────────────────────────────────────────────── -->
         <div class="pdock-search">
@@ -125,48 +116,12 @@ function onRowDblClick(e) {
             </div>
         </div>
 
-        </template><!-- /TAB Tags -->
-
-        <!-- ── TAB: Operaciones ──────────────────────────────────────── -->
-        <template v-else>
-            <OperationsTreeDock
-                class="flex-1 min-h-0"
-                style="overflow:hidden;display:flex;flex-direction:column"
-                @add-metric="m => emit('add-metric', m)"
-            />
-        </template>
-
     </div>
 </template>
 
 <style scoped>
 /* ── Dock ──────────────────────────────────────────────────────────────────── */
 .pdock { background: var(--p-surface-50); font-family: 'Segoe UI', system-ui, sans-serif; }
-
-/* ── Tabs ──────────────────────────────────────────────────────────────────── */
-.pdock-tabs {
-    display: flex; border-bottom: 2px solid var(--p-surface-300);
-    background: var(--p-surface-100);
-}
-.pdock-tab {
-    flex: 1; display: flex; align-items: center; justify-content: center; gap: 4px;
-    padding: 5px 4px; border: none; background: transparent; cursor: pointer;
-    font-size: 0.68rem; font-weight: 600; color: var(--p-text-muted-color);
-    font-family: inherit; border-bottom: 2px solid transparent; margin-bottom: -2px;
-    transition: color 0.15s, border-color 0.15s;
-}
-.pdock-tab:hover { color: var(--p-text-color); }
-.pdock-tab-active { color: var(--p-primary-color); border-bottom-color: var(--p-primary-color); }
-
-.pdock-header {
-    display: flex; align-items: center; gap: 6px;
-    padding: 6px 10px;
-    background: var(--p-surface-100);
-    border-bottom: 1px solid var(--p-surface-200);
-    font-size: 0.72rem; font-weight: 700;
-    text-transform: uppercase; letter-spacing: 0.05em;
-    color: var(--p-text-muted-color);
-}
 
 /* ── Búsqueda ──────────────────────────────────────────────────────────────── */
 .pdock-search {
@@ -230,11 +185,11 @@ function onRowDblClick(e) {
 .node-sitio  { color: var(--p-primary-color); font-weight: 700; }
 .node-planta { color: var(--p-primary-color); }
 .node-area   { color: var(--p-text-muted-color); }
-.node-tag-t  { color: #f59e0b; }   /* temperatura */
-.node-tag-p  { color: #3b82f6; }   /* presión */
-.node-tag-f  { color: #06b6d4; }   /* flujo */
-.node-tag-l  { color: #8b5cf6; }   /* nivel */
-.node-tag-a  { color: #10b981; }   /* analítico */
+.node-tag-t  { color: #f59e0b; }
+.node-tag-p  { color: #3b82f6; }
+.node-tag-f  { color: #06b6d4; }
+.node-tag-l  { color: #8b5cf6; }
+.node-tag-a  { color: #10b981; }
 
 /* ── Leyenda ───────────────────────────────────────────────────────────────── */
 .pdock-legend {
