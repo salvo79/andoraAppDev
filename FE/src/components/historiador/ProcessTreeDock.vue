@@ -1,27 +1,29 @@
 <script setup>
-import { PROCESS_TREE_DX } from '@/service/seguimientoService';
+import { PROCESS_TREE_LIST } from '@/service/seguimientoService';
 import OperationsTreeDock from '@/components/historiador/OperationsTreeDock.vue';
-import { DxTreeView } from 'devextreme-vue/tree-view';
-import { ref } from 'vue';
+import { DxTreeList, DxColumn, DxSearchPanel } from 'devextreme-vue/tree-list';
+import { ref, computed } from 'vue';
 
 const emit = defineEmits(['add-tag', 'add-metric']);
 
-const activeTab = ref('tags'); // 'tags' | 'operaciones'
+const activeTab = ref('tags');
 
-const treeRef = ref(null);
-const search  = ref('');
+const search = ref('');
+
+const expandedKeys = ref(['__root__', 'sitio-norte', 'sitio-sur']);
 
 // ── Iconos por tipo de nodo ───────────────────────────────────────────────────
 const NODE_ICONS = {
-    sitio:  { icon: 'pi pi-map-marker',            cls: 'node-sitio'  },
-    planta: { icon: 'pi pi-building',              cls: 'node-planta' },
-    area:   { icon: 'pi pi-sitemap',               cls: 'node-area'   },
+    root:   { icon: 'pi pi-database',    cls: 'node-root'   },
+    sitio:  { icon: 'pi pi-map-marker',  cls: 'node-sitio'  },
+    planta: { icon: 'pi pi-building',    cls: 'node-planta' },
+    area:   { icon: 'pi pi-sitemap',     cls: 'node-area'   },
     tag:    {
-        T: { icon: 'pi pi-sun',                   cls: 'node-tag-t'  },
-        P: { icon: 'pi pi-gauge',                 cls: 'node-tag-p'  },
-        F: { icon: 'pi pi-arrow-right',           cls: 'node-tag-f'  },
-        L: { icon: 'pi pi-wave-pulse',            cls: 'node-tag-l'  },
-        A: { icon: 'pi pi-chart-line',            cls: 'node-tag-a'  },
+        T: { icon: 'pi pi-sun',          cls: 'node-tag-t' },
+        P: { icon: 'pi pi-gauge',        cls: 'node-tag-p' },
+        F: { icon: 'pi pi-arrow-right',  cls: 'node-tag-f' },
+        L: { icon: 'pi pi-wave-pulse',   cls: 'node-tag-l' },
+        A: { icon: 'pi pi-chart-line',   cls: 'node-tag-a' },
     },
 };
 
@@ -30,17 +32,30 @@ function nodeIcon(item) {
     return NODE_ICONS.tag[item.tagData?.tipo] || NODE_ICONS.tag.A;
 }
 
+// ── Filtrado reactivo (mantiene ancestros visibles) ───────────────────────────
+const filteredData = computed(() => {
+    const q = search.value.trim().toLowerCase();
+    if (!q) return PROCESS_TREE_LIST;
+    const matchIds = new Set();
+    PROCESS_TREE_LIST.forEach(item => {
+        if (item.text.toLowerCase().includes(q)) {
+            matchIds.add(item.id);
+            let parentId = item.parentId;
+            while (parentId) {
+                matchIds.add(parentId);
+                parentId = PROCESS_TREE_LIST.find(x => x.id === parentId)?.parentId ?? null;
+            }
+        }
+    });
+    return PROCESS_TREE_LIST.filter(item => matchIds.has(item.id));
+});
+
 // ── Doble clic → agregar tag ──────────────────────────────────────────────────
-function onItemDblClick(e) {
-    const item = e.itemData;
+function onRowDblClick(e) {
+    const item = e.data;
     if (item.type === 'tag' && item.tagData) {
         emit('add-tag', { key: item.id, ...item.tagData });
     }
-}
-
-// ── Búsqueda en árbol ─────────────────────────────────────────────────────────
-function onSearch() {
-    treeRef.value?.instance.option('searchValue', search.value);
 }
 </script>
 
@@ -75,7 +90,6 @@ function onSearch() {
                 v-model="search"
                 class="pdock-search-input"
                 placeholder="Buscar tag..."
-                @input="onSearch"
             />
         </div>
 
@@ -85,27 +99,32 @@ function onSearch() {
             Doble clic para agregar al análisis
         </div>
 
-        <!-- DxTreeView ──────────────────────────────────────────────────── -->
+        <!-- DxTreeList ──────────────────────────────────────────────────── -->
         <div class="pdock-tree flex-1 overflow-auto">
-            <DxTreeView
-                ref="treeRef"
-                :items="PROCESS_TREE_DX"
-                :search-enabled="false"
-                :expand-all-enabled="false"
-                selection-mode="single"
-                item-alt-text="label"
+            <DxTreeList
+                :data-source="filteredData"
+                key-expr="id"
+                parent-id-expr="parentId"
+                :show-column-headers="false"
+                :show-borders="false"
+                :show-row-lines="false"
+                :show-column-lines="false"
+                :row-alternation-enabled="false"
+                :auto-expand-all="false"
+                :expanded-row-keys="expandedKeys"
                 width="100%"
-                @item-dbl-click="onItemDblClick"
+                @row-dbl-click="onRowDblClick"
             >
-                <template #item="{ data: item }">
-                    <div class="tree-node" :class="item.type">
-                        <i :class="[nodeIcon(item).icon, nodeIcon(item).cls, 'tree-icon']" />
-                        <span class="tree-label">{{ item.text }}</span>
-                        <span v-if="item.type === 'tag' && item.tagData"
-                              class="tree-unit">{{ item.tagData.unidad }}</span>
+                <DxColumn data-field="text" cell-template="nodeTpl" />
+                <template #nodeTpl="{ data: cell }">
+                    <div class="tree-node" :class="cell.data.type">
+                        <i :class="[nodeIcon(cell.data).icon, nodeIcon(cell.data).cls, 'tree-icon']" />
+                        <span class="tree-label">{{ cell.data.text }}</span>
+                        <span v-if="cell.data.type === 'tag' && cell.data.tagData"
+                              class="tree-unit">{{ cell.data.tagData.unidad }}</span>
                     </div>
                 </template>
-            </DxTreeView>
+            </DxTreeList>
         </div>
 
         <!-- Leyenda de tipos ────────────────────────────────────────────── -->
@@ -192,10 +211,18 @@ function onSearch() {
 /* ── Árbol ─────────────────────────────────────────────────────────────────── */
 .pdock-tree { overflow-y: auto; }
 
-/* Override DxTreeView internal styles */
-.pdock-tree :deep(.dx-treeview-item) { padding: 1px 4px !important; }
-.pdock-tree :deep(.dx-treeview-item-content) { padding: 0 !important; }
-.pdock-tree :deep(.dx-treeview-node) { padding-left: 12px !important; }
+/* Override DxTreeList internal styles */
+.pdock-tree :deep(.dx-treelist-cell-expandable) { padding: 1px 4px !important; }
+.pdock-tree :deep(.dx-row > td) { padding: 0 !important; border: none !important; }
+.pdock-tree :deep(.dx-treelist-empty-space) { width: 14px !important; }
+.pdock-tree :deep(.dx-treelist-icon-container) { width: 14px !important; }
+.pdock-tree :deep(.dx-treelist) { background: transparent; }
+.pdock-tree :deep(.dx-treelist-rowsview) { background: transparent; }
+.pdock-tree :deep(.dx-row-focused > td),
+.pdock-tree :deep(.dx-row-focused > td:first-child) {
+    background: var(--p-surface-200) !important;
+    color: inherit !important;
+}
 
 /* ── Nodo del árbol ────────────────────────────────────────────────────────── */
 .tree-node {
@@ -214,6 +241,7 @@ function onSearch() {
 }
 
 /* Colores por tipo de instrumento */
+.node-root   { color: var(--p-primary-color); font-weight: 700; }
 .node-sitio  { color: var(--p-primary-color); font-weight: 700; }
 .node-planta { color: var(--p-primary-color); }
 .node-area   { color: var(--p-text-muted-color); }

@@ -279,6 +279,20 @@ function convertNodeDx(node) {
 export const PROCESS_TREE_DX = PROCESS_TREE.map(convertNodeDx);
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Formato plano para DxTreeList (id / parentId)
+// ─────────────────────────────────────────────────────────────────────────────
+function flattenNode(node, parentId, result) {
+    result.push({ id: node.key, parentId, text: node.label, type: node.type, tagData: node.data || null });
+    node.children?.forEach(child => flattenNode(child, node.key, result));
+}
+
+export const PROCESS_TREE_LIST = (() => {
+    const result = [{ id: '__root__', parentId: null, text: 'Árbol de Proceso', type: 'root', tagData: null }];
+    PROCESS_TREE.forEach(node => flattenNode(node, '__root__', result));
+    return result;
+})();
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Evaluador de fórmulas calculadas: [TAG-KEY] como referencia
 // ─────────────────────────────────────────────────────────────────────────────
 export function evalFormula(formula, values) {
