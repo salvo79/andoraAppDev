@@ -29,6 +29,9 @@ import {
 } from 'devextreme-vue/data-grid';
 import { computed, ref, watch } from 'vue';
 
+// ── Splitter tabla ────────────────────────────────────────────────────────────
+const tableVisible = ref(true);
+
 // ── Props ─────────────────────────────────────────────────────────────────────
 const props = defineProps({
     tags:        { type: Array,  default: () => [] },
@@ -245,8 +248,16 @@ function operColor(m) {
                 </DxRangeSelector>
             </div>
 
+            <!-- ── SPLITTER ──────────────────────────────────────────────── -->
+            <div class="ta-splitter" @click="tableVisible = !tableVisible" :title="tableVisible ? 'Ocultar tabla' : 'Mostrar tabla'">
+                <span class="ta-splitter-label">
+                    <i :class="tableVisible ? 'pi pi-chevron-down' : 'pi pi-chevron-up'" />
+                    {{ tableVisible ? 'Tabla de variables' : 'Tabla de variables' }}
+                </span>
+            </div>
+
             <!-- ── TABLA DE VARIABLES (DxDataGrid) ──────────────────────── -->
-            <div class="ta-grid">
+            <div class="ta-grid" :class="{ 'ta-grid-hidden': !tableVisible }">
                 <DxDataGrid
                     :data-source="gridData"
                     :show-borders="false"
@@ -370,7 +381,31 @@ function operColor(m) {
 /* ── Secciones ─────────────────────────────────────────────────────────────── */
 .ta-chart-area { flex: 1; min-height: 0; overflow: hidden; }
 .ta-range      { height: 74px; border-top: 1px solid var(--p-surface-200); }
-.ta-grid       { height: 130px; border-top: 1px solid var(--p-surface-200); overflow: hidden; }
+
+/* ── Splitter ──────────────────────────────────────────────────────────────── */
+.ta-splitter {
+    display: flex; align-items: center; justify-content: center;
+    height: 18px; cursor: pointer; flex-shrink: 0;
+    background: var(--p-surface-100);
+    border-top: 1px solid var(--p-surface-300);
+    border-bottom: 1px solid var(--p-surface-300);
+    user-select: none;
+}
+.ta-splitter:hover { background: var(--p-primary-50, #eff6ff); }
+.ta-splitter-label {
+    display: flex; align-items: center; gap: 5px;
+    font-size: 0.65rem; font-weight: 600; letter-spacing: 0.04em;
+    text-transform: uppercase; color: var(--p-text-muted-color);
+}
+.ta-splitter:hover .ta-splitter-label { color: var(--p-primary-color); }
+
+/* ── Tabla ─────────────────────────────────────────────────────────────────── */
+.ta-grid {
+    height: 130px; overflow: hidden;
+    transition: height 0.2s ease, opacity 0.2s ease;
+    opacity: 1;
+}
+.ta-grid-hidden { height: 0 !important; opacity: 0; }
 
 /* ── Celdas de la tabla ────────────────────────────────────────────────────── */
 .ta-dot {
