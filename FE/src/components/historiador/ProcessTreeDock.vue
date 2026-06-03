@@ -103,18 +103,7 @@ function onRowDblClick(e) {
             </DxTreeList>
         </div>
 
-        <!-- Leyenda de tipos ────────────────────────────────────────────── -->
-        <div class="pdock-legend">
-            <div class="legend-row">
-                <i class="pi pi-sun node-tag-t" /> Temperatura
-                <i class="pi pi-gauge node-tag-p ml-2" /> Presión
-            </div>
-            <div class="legend-row">
-                <i class="pi pi-arrow-right node-tag-f" /> Flujo
-                <i class="pi pi-wave-pulse node-tag-l ml-2" /> Nivel
-                <i class="pi pi-chart-line node-tag-a ml-2" /> Analítico
-            </div>
-        </div>
+        
 
     </div>
 </template>
