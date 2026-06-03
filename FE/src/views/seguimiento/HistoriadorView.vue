@@ -42,7 +42,7 @@ const atlasIcon = computed(() => ({
 // DOCKS
 // ══════════════════════════════════════════════════════════════════════════════
 const leftOpen  = ref(true);
-const rightOpen = ref(true);
+const rightOpen = ref(false);
 const LEFT_W    = 240;
 const RIGHT_W   = 270;
 
@@ -575,9 +575,7 @@ function fmtDate(d) {
                     <span>Árbol de Proceso</span>
                 </div>
                 <div v-else class="vs-dock-content h-full">
-                    <ProcessTreeDock
-                        @add-tag="addTag"
-                    />
+                   
                 </div>
             </div>
 
