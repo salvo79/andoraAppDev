@@ -62,11 +62,6 @@ function onRowDblClick(e) {
 <template>
     <div class="pdock flex flex-column h-full">
 
-        <!-- Cabecera dock ───────────────────────────────────────────────── -->
-        <div class="pdock-header">
-            <i class="pi pi-sitemap" />
-            <span>Árbol de Proceso</span>
-        </div>
 
         <!-- Tabs: Tags | Operaciones ──────────────────────────────────── -->
         <div class="pdock-tabs">
