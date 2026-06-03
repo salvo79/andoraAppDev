@@ -63,17 +63,7 @@ function onRowDblClick(e) {
     <div class="pdock flex flex-column h-full">
 
 
-        <!-- Tabs: Tags | Operaciones ──────────────────────────────────── -->
-        <div class="pdock-tabs">
-            <button class="pdock-tab" :class="{ 'pdock-tab-active': activeTab === 'tags' }"
-                    @click="activeTab = 'tags'">
-                <i class="pi pi-microchip" /> Tags
-            </button>
-            <button class="pdock-tab" :class="{ 'pdock-tab-active': activeTab === 'operaciones' }"
-                    @click="activeTab = 'operaciones'">
-                <i class="pi pi-chart-bar" /> Operaciones
-            </button>
-        </div>
+
 
         <!-- ── TAB: Tags ─────────────────────────────────────────────── -->
         <template v-if="activeTab === 'tags'">
