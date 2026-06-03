@@ -575,7 +575,7 @@ function fmtDate(d) {
                     <span>Árbol de Proceso</span>
                 </div>
                 <div v-else class="vs-dock-content h-full">
-                    <ProcessTreeDock @add-tag="addTag" />
+                   
                 </div>
             </div>
 
