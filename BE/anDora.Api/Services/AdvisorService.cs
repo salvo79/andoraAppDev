@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using MongoDB.Driver;
+using Google.Apis.Auth.OAuth2;
 using anDora.Api.Data;
 using anDora.Api.Models.Advisor;
 using anDora.Api.Models.Operations;
@@ -15,7 +16,7 @@ public class AdvisorService
     private readonly HttpClient _http;
     private readonly OperationsContext _ops;
     private readonly CatalogContext _catalog;
-    private const string ClaudeModel = "claude-sonnet-4-6";
+    private readonly string _vertexEndpoint;
     private const int MaxIterations = 8;
 
     private const string SystemPrompt = """
@@ -42,122 +43,148 @@ public class AdvisorService
         6. Si el usuario pregunta por una planta específica, busca su clave en el catálogo primero
         """;
 
-    private readonly string? _apiKey;
-
     public AdvisorService(IConfiguration config, OperationsContext ops, CatalogContext catalog)
     {
         _ops     = ops;
         _catalog = catalog;
-        _apiKey  = config["Anthropic:ApiKey"];
+
+        var project = config["Vertex:ProjectId"] ?? "andora-dev";
+        var region  = config["Vertex:Region"]    ?? "us-central1";
+        var model   = config["Vertex:Model"]     ?? "gemini-2.0-flash-001";
+
+        _vertexEndpoint = $"https://{region}-aiplatform.googleapis.com/v1/projects/{project}" +
+                          $"/locations/{region}/publishers/google/models/{model}:generateContent";
 
         _http = new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
-        _http.DefaultRequestHeaders.Add("anthropic-version", "2023-06-01");
         _http.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
     }
 
     public async Task<string> ChatAsync(string userMessage, List<AdvisorMessageDto> history)
     {
-        if (string.IsNullOrWhiteSpace(_apiKey))
-            return "⚠️ El Advisor no está disponible: la variable de entorno `Anthropic__ApiKey` no está configurada en el servidor.";
-
-        var messages = new JsonArray();
+        // Construir el array de contents en formato Gemini
+        var contents = new JsonArray();
 
         foreach (var h in history)
         {
-            messages.Add(new JsonObject
+            // Gemini usa "model" donde Anthropic usaba "assistant"
+            var geminiRole = h.Role == "assistant" ? "model" : "user";
+            contents.Add(new JsonObject
             {
-                ["role"] = h.Role,
-                ["content"] = h.Content
+                ["role"]  = geminiRole,
+                ["parts"] = new JsonArray { new JsonObject { ["text"] = h.Content } }
             });
         }
-        messages.Add(new JsonObject
+        contents.Add(new JsonObject
         {
-            ["role"] = "user",
-            ["content"] = userMessage
+            ["role"]  = "user",
+            ["parts"] = new JsonArray { new JsonObject { ["text"] = userMessage } }
         });
 
         for (int iter = 0; iter < MaxIterations; iter++)
         {
-            var response = await CallClaudeAsync(messages);
-            var stopReason = response["stop_reason"]?.GetValue<string>();
-            var content = response["content"]?.AsArray() ?? [];
+            var response  = await CallGeminiAsync(contents);
+            var candidate = response["candidates"]?.AsArray().FirstOrDefault();
+            if (candidate == null) return "Sin respuesta del modelo.";
 
-            if (stopReason == "end_turn")
+            var parts = candidate["content"]?["parts"]?.AsArray() ?? [];
+
+            // Verificar si hay function calls
+            var functionCalls = parts.Where(p => p?["functionCall"] != null).ToList();
+
+            if (functionCalls.Count == 0)
             {
+                // Sin function calls → extraer texto y retornar
                 var sb = new StringBuilder();
-                foreach (var block in content)
-                {
-                    if (block?["type"]?.GetValue<string>() == "text")
-                        sb.Append(block["text"]?.GetValue<string>());
-                }
+                foreach (var part in parts)
+                    if (part?["text"] != null)
+                        sb.Append(part["text"]!.GetValue<string>());
                 return sb.ToString();
             }
 
-            if (stopReason == "tool_use")
+            // Agregar respuesta del modelo al historial
+            contents.Add(new JsonObject
             {
-                // Add assistant message with all content blocks (text + tool_use)
-                messages.Add(new JsonObject
+                ["role"]  = "model",
+                ["parts"] = JsonNode.Parse(parts.ToJsonString())!
+            });
+
+            // Ejecutar cada function call y construir la respuesta
+            var responseParts = new JsonArray();
+            foreach (var fcPart in functionCalls)
+            {
+                var fc       = fcPart!["functionCall"]!.AsObject();
+                var toolName = fc["name"]?.GetValue<string>() ?? string.Empty;
+                var toolArgs = fc["args"]?.AsObject();
+
+                var result = await ExecuteToolAsync(toolName, toolArgs);
+
+                responseParts.Add(new JsonObject
                 {
-                    ["role"] = "assistant",
-                    ["content"] = JsonNode.Parse(content.ToJsonString())!
-                });
-
-                // Execute every tool_use block and collect results
-                var toolResults = new JsonArray();
-                foreach (var block in content)
-                {
-                    if (block?["type"]?.GetValue<string>() != "tool_use") continue;
-
-                    var toolId   = block["id"]?.GetValue<string>()   ?? string.Empty;
-                    var toolName = block["name"]?.GetValue<string>() ?? string.Empty;
-                    var toolInput = block["input"]?.AsObject();
-
-                    var result = await ExecuteToolAsync(toolName, toolInput);
-
-                    toolResults.Add(new JsonObject
+                    ["functionResponse"] = new JsonObject
                     {
-                        ["type"]        = "tool_result",
-                        ["tool_use_id"] = toolId,
-                        ["content"]     = result
-                    });
-                }
-
-                messages.Add(new JsonObject
-                {
-                    ["role"]    = "user",
-                    ["content"] = toolResults
+                        ["name"]     = toolName,
+                        ["response"] = new JsonObject { ["output"] = result }
+                    }
                 });
             }
+
+            contents.Add(new JsonObject
+            {
+                ["role"]  = "user",
+                ["parts"] = responseParts
+            });
         }
 
         return "No pude completar el análisis en el número máximo de pasos. Por favor reformula tu pregunta.";
     }
 
-    // ── Claude API call ──────────────────────────────────────────────────────
+    // ── Vertex AI (Gemini) call ──────────────────────────────────────────────
 
-    private async Task<JsonObject> CallClaudeAsync(JsonArray messages)
+    private async Task<JsonObject> CallGeminiAsync(JsonArray contents)
     {
+        var token = await GetGoogleTokenAsync();
+
         var body = new JsonObject
         {
-            ["model"]      = ClaudeModel,
-            ["max_tokens"] = 4096,
-            ["system"]     = SystemPrompt,
-            ["tools"]      = JsonNode.Parse(JsonSerializer.Serialize(BuildTools())),
-            ["messages"]   = JsonNode.Parse(messages.ToJsonString())
+            ["contents"] = JsonNode.Parse(contents.ToJsonString()),
+            ["system_instruction"] = new JsonObject
+            {
+                ["parts"] = new JsonArray { new JsonObject { ["text"] = SystemPrompt } }
+            },
+            ["tools"] = new JsonArray
+            {
+                new JsonObject
+                {
+                    ["function_declarations"] = JsonNode.Parse(JsonSerializer.Serialize(BuildGeminiTools()))
+                }
+            },
+            ["generation_config"] = new JsonObject
+            {
+                ["max_output_tokens"] = 4096,
+                ["temperature"]       = 0.1
+            }
         };
 
-        var req = new HttpRequestMessage(HttpMethod.Post, "https://api.anthropic.com/v1/messages")
+        var req = new HttpRequestMessage(HttpMethod.Post, _vertexEndpoint)
         {
             Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json")
         };
-        req.Headers.Add("x-api-key", _apiKey);
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
         var resp = await _http.SendAsync(req);
         var json = await resp.Content.ReadAsStringAsync();
 
         if (!resp.IsSuccessStatusCode)
-            throw new Exception($"Claude API error {resp.StatusCode}: {json}");
+            throw new Exception($"Vertex AI error {resp.StatusCode}: {json}");
 
         return JsonNode.Parse(json)!.AsObject();
+    }
+
+    private static async Task<string> GetGoogleTokenAsync()
+    {
+        var credential = GoogleCredential.GetApplicationDefault()
+            .CreateScoped("https://www.googleapis.com/auth/cloud-platform");
+        return await ((ITokenAccess)credential).GetAccessTokenForRequestAsync();
     }
 
     // ── Tool dispatcher ──────────────────────────────────────────────────────
@@ -892,21 +919,22 @@ public class AdvisorService
         return DateTime.TryParse(value, out var d) ? DateTime.SpecifyKind(d, DateTimeKind.Utc) : defaultValue;
     }
 
-    private static object[] BuildTools() =>
+    // Gemini exige tipos en MAYÚSCULAS (STRING, NUMBER, OBJECT…) y usa "parameters" en lugar de "input_schema"
+    private static object[] BuildGeminiTools() =>
     [
         new
         {
             name = "query_produccion",
             description = "Consulta resúmenes de producción diaria por planta. Retorna cantidades, costos, % merma y estado de calidad.",
-            input_schema = new
+            parameters = new
             {
-                type = "object",
+                type = "OBJECT",
                 properties = new
                 {
-                    planta_clave  = new { type = "string", description = "Clave de la planta (ej: PL01). Omitir para todas." },
-                    fecha_inicio  = new { type = "string", description = "Fecha inicio YYYY-MM-DD. Default: hace 30 días." },
-                    fecha_fin     = new { type = "string", description = "Fecha fin YYYY-MM-DD. Default: hoy." },
-                    agrupar_por   = new { type = "string", @enum = new[] { "planta", "mes", "dia" }, description = "Nivel de agrupación. Default: planta." }
+                    planta_clave = new { type = "STRING", description = "Clave de la planta (ej: PL01). Omitir para todas." },
+                    fecha_inicio = new { type = "STRING", description = "Fecha inicio YYYY-MM-DD. Default: hace 30 días." },
+                    fecha_fin    = new { type = "STRING", description = "Fecha fin YYYY-MM-DD. Default: hoy." },
+                    agrupar_por  = new { type = "STRING", description = "Agrupación: planta | mes | dia. Default: planta." }
                 }
             }
         },
@@ -914,15 +942,15 @@ public class AdvisorService
         {
             name = "query_paros",
             description = "Consulta paros no programados: causas, duración, costo e impacto en producción.",
-            input_schema = new
+            parameters = new
             {
-                type = "object",
+                type = "OBJECT",
                 properties = new
                 {
-                    planta_clave = new { type = "string", description = "Clave de la planta. Omitir para todas." },
-                    fecha_inicio = new { type = "string", description = "Fecha inicio YYYY-MM-DD. Default: hace 90 días." },
-                    fecha_fin    = new { type = "string", description = "Fecha fin YYYY-MM-DD. Default: hoy." },
-                    agrupar_por  = new { type = "string", @enum = new[] { "causa", "planta" }, description = "Agrupar por causa o por planta. Default: causa." }
+                    planta_clave = new { type = "STRING", description = "Clave de la planta. Omitir para todas." },
+                    fecha_inicio = new { type = "STRING", description = "Fecha inicio YYYY-MM-DD. Default: hace 90 días." },
+                    fecha_fin    = new { type = "STRING", description = "Fecha fin YYYY-MM-DD. Default: hoy." },
+                    agrupar_por  = new { type = "STRING", description = "Agrupación: causa | planta. Default: causa." }
                 }
             }
         },
@@ -930,14 +958,14 @@ public class AdvisorService
         {
             name = "query_mezclado",
             description = "Consulta el mezclado diario de corrientes por planta: tipo de corriente, cantidad en kg y calidad.",
-            input_schema = new
+            parameters = new
             {
-                type = "object",
+                type = "OBJECT",
                 properties = new
                 {
-                    planta_clave = new { type = "string", description = "Clave de la planta. Omitir para todas." },
-                    fecha_inicio = new { type = "string", description = "Fecha inicio YYYY-MM-DD. Default: hace 30 días." },
-                    fecha_fin    = new { type = "string", description = "Fecha fin YYYY-MM-DD. Default: hoy." }
+                    planta_clave = new { type = "STRING", description = "Clave de la planta. Omitir para todas." },
+                    fecha_inicio = new { type = "STRING", description = "Fecha inicio YYYY-MM-DD. Default: hace 30 días." },
+                    fecha_fin    = new { type = "STRING", description = "Fecha fin YYYY-MM-DD. Default: hoy." }
                 }
             }
         },
@@ -945,33 +973,28 @@ public class AdvisorService
         {
             name = "query_precios",
             description = "Consulta precios reales de productos: precio neto, costo, margen % e índice base 100.",
-            input_schema = new
+            parameters = new
             {
-                type = "object",
+                type = "OBJECT",
                 properties = new
                 {
-                    codigo       = new { type = "string", description = "Código del producto. Omitir para todos." },
-                    categoria    = new { type = "string", description = "Categoría del producto. Omitir para todas." },
-                    fecha_inicio = new { type = "string", description = "Fecha inicio YYYY-MM-DD. Default: hace 90 días." },
-                    fecha_fin    = new { type = "string", description = "Fecha fin YYYY-MM-DD. Default: hoy." }
+                    codigo       = new { type = "STRING", description = "Código del producto. Omitir para todos." },
+                    categoria    = new { type = "STRING", description = "Categoría del producto. Omitir para todas." },
+                    fecha_inicio = new { type = "STRING", description = "Fecha inicio YYYY-MM-DD. Default: hace 90 días." },
+                    fecha_fin    = new { type = "STRING", description = "Fecha fin YYYY-MM-DD. Default: hoy." }
                 }
             }
         },
         new
         {
             name = "query_catalog",
-            description = "Obtiene catálogos maestros: lista de plantas, productos, corrientes, proveedores, sitios, tanques o rutas.",
-            input_schema = new
+            description = "Obtiene catálogos maestros: plantas, productos, corrientes, proveedores, sitios, tanques, rutas, vendedores o clientes.",
+            parameters = new
             {
-                type = "object",
+                type = "OBJECT",
                 properties = new
                 {
-                    tipo = new
-                    {
-                        type = "string",
-                        @enum = new[] { "plantas", "productos", "corrientes", "proveedores", "sitios", "tanques", "rutas", "vendedores", "clientes" },
-                        description = "Tipo de catálogo a consultar."
-                    }
+                    tipo = new { type = "STRING", description = "Tipo: plantas | productos | corrientes | proveedores | sitios | tanques | rutas | vendedores | clientes." }
                 },
                 required = new[] { "tipo" }
             }
@@ -979,19 +1002,19 @@ public class AdvisorService
         new
         {
             name = "query_programa_ventas",
-            description = "Compara el programa (forecast) de ventas contra las ventas reales. Cruza plan vs real por vendedor, cliente, canal, producto o mes. Muestra cumplimiento %, desviación MXN, margen plan vs real y comisión planeada. Úsalo para analizar objetivos de venta y desempeño de vendedores.",
-            input_schema = new
+            description = "Compara el programa (forecast) de ventas contra las ventas reales. Cruza plan vs real por vendedor, cliente, canal, producto o mes. Muestra cumplimiento %, desviación MXN, margen y comisión planeada.",
+            parameters = new
             {
-                type = "object",
+                type = "OBJECT",
                 properties = new
                 {
-                    fecha_inicio     = new { type = "string", description = "Fecha inicio YYYY-MM-DD. Default: hace 90 días." },
-                    fecha_fin        = new { type = "string", description = "Fecha fin YYYY-MM-DD. Default: hoy." },
-                    agrupar_por      = new { type = "string", @enum = new[] { "vendedor", "cliente", "canal", "producto", "mes" }, description = "Nivel de análisis. Default: vendedor." },
-                    vendedor_codigo  = new { type = "string", description = "Filtrar por código exacto de vendedor." },
-                    cliente_codigo   = new { type = "string", description = "Filtrar por código exacto de cliente." },
-                    canal            = new { type = "string", @enum = new[] { "directo", "distribuidor", "exportacion", "mostrador" }, description = "Filtrar por canal de venta." },
-                    producto_codigo  = new { type = "string", description = "Filtrar por código de producto." }
+                    fecha_inicio    = new { type = "STRING", description = "Fecha inicio YYYY-MM-DD. Default: hace 90 días." },
+                    fecha_fin       = new { type = "STRING", description = "Fecha fin YYYY-MM-DD. Default: hoy." },
+                    agrupar_por     = new { type = "STRING", description = "Agrupación: vendedor | cliente | canal | producto | mes. Default: vendedor." },
+                    vendedor_codigo = new { type = "STRING", description = "Filtrar por código exacto de vendedor." },
+                    cliente_codigo  = new { type = "STRING", description = "Filtrar por código exacto de cliente." },
+                    canal           = new { type = "STRING", description = "Canal: directo | distribuidor | exportacion | mostrador." },
+                    producto_codigo = new { type = "STRING", description = "Filtrar por código de producto." }
                 }
             }
         },
@@ -999,49 +1022,49 @@ public class AdvisorService
         {
             name = "query_ventas",
             description = "Consulta transacciones de venta: ingresos, margen, cantidad despachada, descuentos y flete por producto, cliente, mes o estatus.",
-            input_schema = new
+            parameters = new
             {
-                type = "object",
+                type = "OBJECT",
                 properties = new
                 {
-                    fecha_inicio      = new { type = "string", description = "Fecha inicio YYYY-MM-DD. Default: hace 30 días." },
-                    fecha_fin         = new { type = "string", description = "Fecha fin YYYY-MM-DD. Default: hoy." },
-                    agrupar_por       = new { type = "string", @enum = new[] { "producto", "cliente", "mes", "estatus" }, description = "Nivel de agrupación. Default: producto." },
-                    cliente_nombre    = new { type = "string", description = "Filtro por nombre o fragmento del cliente." },
-                    producto_codigo   = new { type = "string", description = "Filtro por código exacto del producto." },
-                    estatus           = new { type = "string", @enum = new[] { "entregada", "facturada" }, description = "Filtrar por estatus de la orden." }
+                    fecha_inicio    = new { type = "STRING", description = "Fecha inicio YYYY-MM-DD. Default: hace 30 días." },
+                    fecha_fin       = new { type = "STRING", description = "Fecha fin YYYY-MM-DD. Default: hoy." },
+                    agrupar_por     = new { type = "STRING", description = "Agrupación: producto | cliente | mes | estatus. Default: producto." },
+                    cliente_nombre  = new { type = "STRING", description = "Filtro por nombre o fragmento del cliente." },
+                    producto_codigo = new { type = "STRING", description = "Filtro por código exacto del producto." },
+                    estatus         = new { type = "STRING", description = "Estatus: entregada | facturada." }
                 }
             }
         },
         new
         {
             name = "query_compras",
-            description = "Consulta órdenes de compra de materia prima: proveedor, producto, cantidades, precios e IVA agrupados por proveedor, producto, planta o mes.",
-            input_schema = new
+            description = "Consulta órdenes de compra de materia prima: proveedor, producto, cantidades, precios e IVA.",
+            parameters = new
             {
-                type = "object",
+                type = "OBJECT",
                 properties = new
                 {
-                    fecha_inicio    = new { type = "string", description = "Fecha inicio YYYY-MM-DD. Default: hace 90 días." },
-                    fecha_fin       = new { type = "string", description = "Fecha fin YYYY-MM-DD. Default: hoy." },
-                    agrupar_por     = new { type = "string", @enum = new[] { "proveedor", "producto", "planta", "mes" }, description = "Nivel de agrupación. Default: proveedor." },
-                    planta_clave    = new { type = "string", description = "Filtrar por clave de planta." },
-                    producto_codigo = new { type = "string", description = "Filtrar por código de producto." }
+                    fecha_inicio    = new { type = "STRING", description = "Fecha inicio YYYY-MM-DD. Default: hace 90 días." },
+                    fecha_fin       = new { type = "STRING", description = "Fecha fin YYYY-MM-DD. Default: hoy." },
+                    agrupar_por     = new { type = "STRING", description = "Agrupación: proveedor | producto | planta | mes. Default: proveedor." },
+                    planta_clave    = new { type = "STRING", description = "Filtrar por clave de planta." },
+                    producto_codigo = new { type = "STRING", description = "Filtrar por código de producto." }
                 }
             }
         },
         new
         {
             name = "query_ordenes",
-            description = "Consulta el resumen diario de órdenes (OV y OC): número de órdenes de venta y compra, volumen despachado, ingresos, costo de materia prima y margen. Útil para ver el estado general de pedidos por día, semana o mes.",
-            input_schema = new
+            description = "Resumen diario de OV y OC: número de órdenes, volumen, ingresos, costo MP y margen por día, semana o mes.",
+            parameters = new
             {
-                type = "object",
+                type = "OBJECT",
                 properties = new
                 {
-                    fecha_inicio = new { type = "string", description = "Fecha inicio YYYY-MM-DD. Default: hace 30 días." },
-                    fecha_fin    = new { type = "string", description = "Fecha fin YYYY-MM-DD. Default: hoy." },
-                    agrupar_por  = new { type = "string", @enum = new[] { "dia", "semana", "mes" }, description = "Nivel de agrupación. Default: dia." }
+                    fecha_inicio = new { type = "STRING", description = "Fecha inicio YYYY-MM-DD. Default: hace 30 días." },
+                    fecha_fin    = new { type = "STRING", description = "Fecha fin YYYY-MM-DD. Default: hoy." },
+                    agrupar_por  = new { type = "STRING", description = "Agrupación: dia | semana | mes. Default: dia." }
                 }
             }
         }
