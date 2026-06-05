@@ -22,5 +22,7 @@ namespace anDora.Api.Data
         public IMongoCollection<Producto>      Productos    => _db.GetCollection<Producto>("cat_productos");
         public IMongoCollection<Corriente>     Corrientes   => _db.GetCollection<Corriente>("cat_corrientes");
         public IMongoCollection<PrecioCatalogo> Precios     => _db.GetCollection<PrecioCatalogo>("cat_precios");
+        public IMongoCollection<Vendedor>      Vendedores  => _db.GetCollection<Vendedor>("vendedores");
+        public IMongoCollection<Cliente>       Clientes    => _db.GetCollection<Cliente>("cat_clientes");
     }
 }

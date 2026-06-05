@@ -107,6 +107,7 @@ builder.Services.AddTransient<anDora.Api.Services.EmailService>(); // ← solo a
 
 builder.Services.AddAuthorization();
 builder.Services.AddSingleton<anDora.Api.Services.GcsService>();
+builder.Services.AddSingleton<anDora.Api.Services.AdvisorService>();
 
 builder.Services.AddCors(options =>
 {

@@ -25,5 +25,17 @@ namespace anDora.Api.Data
 
         public IMongoCollection<ResumenPreciosReales> ResumenPrecios =>
             _db.GetCollection<ResumenPreciosReales>("resumen_precios_reales");
+
+        public IMongoCollection<Transaccion> Transacciones =>
+            _db.GetCollection<Transaccion>("transacciones");
+
+        public IMongoCollection<OrdenCompraVenta> OrdenesCompraVenta =>
+            _db.GetCollection<OrdenCompraVenta>("ordenes_compra_venta");
+
+        public IMongoCollection<ResumenDiarioOrdenes> ResumenDiarioOrdenes =>
+            _db.GetCollection<ResumenDiarioOrdenes>("resumen_diario_ordenes");
+
+        public IMongoCollection<ProgramaVenta> ProgramaVentas =>
+            _db.GetCollection<ProgramaVenta>("programa_ventas");
     }
 }
