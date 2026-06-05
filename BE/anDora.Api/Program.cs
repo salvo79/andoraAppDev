@@ -138,9 +138,32 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-// UseCors ANTES de UseRouting para que los headers CORS estén presentes
-// incluso en respuestas de error (4xx/5xx) generadas por el pipeline
-app.UseCors("AllowFrontend");
+// Middleware CORS manual — corre primero, antes de routing y auth.
+// Garantiza Access-Control-Allow-Origin en TODA respuesta (200, 401, 500…)
+// y resuelve preflights OPTIONS sin pasar por autenticación.
+app.Use(async (ctx, next) =>
+{
+    string[] allowedOrigins = ["https://salvo79.github.io", "http://localhost:5173"];
+    var origin = ctx.Request.Headers.Origin.FirstOrDefault() ?? "";
+
+    if (allowedOrigins.Contains(origin))
+    {
+        ctx.Response.Headers["Access-Control-Allow-Origin"]      = origin;
+        ctx.Response.Headers["Access-Control-Allow-Credentials"] = "true";
+        ctx.Response.Headers["Access-Control-Allow-Headers"]     = "Authorization, Content-Type, Accept";
+        ctx.Response.Headers["Access-Control-Allow-Methods"]     = "GET, POST, PUT, PATCH, DELETE, OPTIONS";
+        ctx.Response.Headers["Vary"]                             = "Origin";
+    }
+
+    if (HttpMethods.IsOptions(ctx.Request.Method))
+    {
+        ctx.Response.StatusCode = StatusCodes.Status204NoContent;
+        return;
+    }
+
+    await next();
+});
+
 app.UseRouting();
 
 var wwwrootPath = Path.Combine(app.Environment.ContentRootPath, "wwwroot");
