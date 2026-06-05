@@ -3,7 +3,6 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using MongoDB.Driver;
-using Google.Apis.Auth.OAuth2;
 using anDora.Api.Data;
 using anDora.Api.Models.Advisor;
 using anDora.Api.Models.Operations;
@@ -16,7 +15,7 @@ public class AdvisorService
     private readonly HttpClient _http;
     private readonly OperationsContext _ops;
     private readonly CatalogContext _catalog;
-    private readonly string _vertexEndpoint;
+    private readonly string _geminiEndpoint;
     private const int MaxIterations = 8;
 
     private const string SystemPrompt = """
@@ -43,17 +42,18 @@ public class AdvisorService
         6. Si el usuario pregunta por una planta específica, busca su clave en el catálogo primero
         """;
 
+    private readonly string? _apiKey;
+
     public AdvisorService(IConfiguration config, OperationsContext ops, CatalogContext catalog)
     {
-        _ops     = ops;
+        _ops    = ops;
         _catalog = catalog;
 
-        var project = config["Vertex:ProjectId"] ?? "andora-dev";
-        var region  = config["Vertex:Region"]    ?? "us-central1";
-        var model   = config["Vertex:Model"]     ?? "gemini-2.0-flash-001";
+        _apiKey = config["Gemini:ApiKey"];
+        var model = config["Gemini:Model"] ?? "gemini-1.5-flash";
 
-        _vertexEndpoint = $"https://{region}-aiplatform.googleapis.com/v1/projects/{project}" +
-                          $"/locations/{region}/publishers/google/models/{model}:generateContent";
+        // Google AI Studio — mismo formato que Vertex AI, sin necesidad de OAuth
+        _geminiEndpoint = $"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent";
 
         _http = new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
         _http.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
@@ -61,6 +61,9 @@ public class AdvisorService
 
     public async Task<string> ChatAsync(string userMessage, List<AdvisorMessageDto> history)
     {
+        if (string.IsNullOrWhiteSpace(_apiKey))
+            return "⚠️ El Advisor no está disponible: configura la variable de entorno `Gemini__ApiKey` en Cloud Run con tu API key de Google AI Studio (aistudio.google.com).";
+
         // Construir el array de contents en formato Gemini
         var contents = new JsonArray();
 
@@ -149,8 +152,6 @@ public class AdvisorService
 
     private async Task<JsonObject> CallGeminiAsync(JsonArray contents)
     {
-        var token = await GetGoogleTokenAsync();
-
         var body = new JsonObject
         {
             ["contents"] = JsonNode.Parse(contents.ToJsonString()),
@@ -172,26 +173,20 @@ public class AdvisorService
             }
         };
 
-        var req = new HttpRequestMessage(HttpMethod.Post, _vertexEndpoint)
+        // API key como query parameter — formato estándar de Google AI Studio
+        var url = $"{_geminiEndpoint}?key={_apiKey}";
+        var req = new HttpRequestMessage(HttpMethod.Post, url)
         {
             Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json")
         };
-        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         var resp = await _http.SendAsync(req);
         var json = await resp.Content.ReadAsStringAsync();
 
         if (!resp.IsSuccessStatusCode)
-            throw new Exception($"Vertex AI error {resp.StatusCode}: {json}");
+            throw new Exception($"Gemini API error {resp.StatusCode}: {json}");
 
         return JsonNode.Parse(json)!.AsObject();
-    }
-
-    private static async Task<string> GetGoogleTokenAsync()
-    {
-        var credential = GoogleCredential.GetApplicationDefault()
-            .CreateScoped("https://www.googleapis.com/auth/cloud-platform");
-        return await ((ITokenAccess)credential).GetAccessTokenForRequestAsync();
     }
 
     // ── Tool dispatcher ──────────────────────────────────────────────────────
