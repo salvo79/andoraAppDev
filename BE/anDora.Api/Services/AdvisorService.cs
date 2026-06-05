@@ -82,7 +82,14 @@ public class AdvisorService
 
         for (int iter = 0; iter < MaxIterations; iter++)
         {
-            var response  = await CallGeminiAsync(contents);
+            JsonObject response;
+            try { response = await CallGeminiAsync(contents); }
+            catch (Exception ex)
+            {
+                return $"⚠️ Error al llamar a Vertex AI: {ex.Message}\n\n" +
+                       "Verifica que la API de Vertex AI esté habilitada en el proyecto GCP " +
+                       "y que el service account tenga el rol `Vertex AI User`.";
+            }
             var candidate = response["candidates"]?.AsArray().FirstOrDefault();
             if (candidate == null) return "Sin respuesta del modelo.";
 
