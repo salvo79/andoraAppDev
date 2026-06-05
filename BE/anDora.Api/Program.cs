@@ -138,8 +138,10 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-app.UseRouting();
+// UseCors ANTES de UseRouting para que los headers CORS estén presentes
+// incluso en respuestas de error (4xx/5xx) generadas por el pipeline
 app.UseCors("AllowFrontend");
+app.UseRouting();
 
 var wwwrootPath = Path.Combine(app.Environment.ContentRootPath, "wwwroot");
 Directory.CreateDirectory(wwwrootPath);

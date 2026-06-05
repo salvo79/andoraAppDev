@@ -42,21 +42,24 @@ public class AdvisorService
         6. Si el usuario pregunta por una planta específica, busca su clave en el catálogo primero
         """;
 
+    private readonly string? _apiKey;
+
     public AdvisorService(IConfiguration config, OperationsContext ops, CatalogContext catalog)
     {
-        _ops = ops;
+        _ops     = ops;
         _catalog = catalog;
+        _apiKey  = config["Anthropic:ApiKey"];
 
         _http = new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
-        var apiKey = config["Anthropic:ApiKey"]
-            ?? throw new InvalidOperationException("Anthropic:ApiKey no configurado en appsettings.");
-        _http.DefaultRequestHeaders.Add("x-api-key", apiKey);
         _http.DefaultRequestHeaders.Add("anthropic-version", "2023-06-01");
         _http.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
     }
 
     public async Task<string> ChatAsync(string userMessage, List<AdvisorMessageDto> history)
     {
+        if (string.IsNullOrWhiteSpace(_apiKey))
+            return "⚠️ El Advisor no está disponible: la variable de entorno `Anthropic__ApiKey` no está configurada en el servidor.";
+
         var messages = new JsonArray();
 
         foreach (var h in history)
@@ -143,8 +146,12 @@ public class AdvisorService
             ["messages"]   = JsonNode.Parse(messages.ToJsonString())
         };
 
-        var req = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json");
-        var resp = await _http.PostAsync("https://api.anthropic.com/v1/messages", req);
+        var req = new HttpRequestMessage(HttpMethod.Post, "https://api.anthropic.com/v1/messages")
+        {
+            Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json")
+        };
+        req.Headers.Add("x-api-key", _apiKey);
+        var resp = await _http.SendAsync(req);
         var json = await resp.Content.ReadAsStringAsync();
 
         if (!resp.IsSuccessStatusCode)
