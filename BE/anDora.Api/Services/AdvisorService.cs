@@ -52,7 +52,6 @@ public class AdvisorService
         _apiKey = config["Gemini:ApiKey"];
         var model = config["Gemini:Model"] ?? "gemini-1.5-flash";
 
-        // Google AI Studio — mismo formato que Vertex AI, sin necesidad de OAuth
         _geminiEndpoint = $"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent";
 
         _http = new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
@@ -62,7 +61,7 @@ public class AdvisorService
     public async Task<string> ChatAsync(string userMessage, List<AdvisorMessageDto> history)
     {
         if (string.IsNullOrWhiteSpace(_apiKey))
-            return "⚠️ El Advisor no está disponible: configura la variable de entorno `Gemini__ApiKey` en Cloud Run con tu API key de Google AI Studio (aistudio.google.com).";
+            return "⚠️ El Advisor no está disponible: configura `Gemini:ApiKey` con tu API key de Google AI Studio (aistudio.google.com).";
 
         // Construir el array de contents en formato Gemini
         var contents = new JsonArray();
@@ -89,9 +88,8 @@ public class AdvisorService
             try { response = await CallGeminiAsync(contents); }
             catch (Exception ex)
             {
-                return $"⚠️ Error al llamar a Vertex AI: {ex.Message}\n\n" +
-                       "Verifica que la API de Vertex AI esté habilitada en el proyecto GCP " +
-                       "y que el service account tenga el rol `Vertex AI User`.";
+                return $"⚠️ Error al llamar a Gemini API: {ex.Message}\n\n" +
+                       "Verifica que la API key de Google AI Studio sea válida (aistudio.google.com/app/apikey).";
             }
             var candidate = response["candidates"]?.AsArray().FirstOrDefault();
             if (candidate == null) return "Sin respuesta del modelo.";
@@ -148,7 +146,7 @@ public class AdvisorService
         return "No pude completar el análisis en el número máximo de pasos. Por favor reformula tu pregunta.";
     }
 
-    // ── Vertex AI (Gemini) call ──────────────────────────────────────────────
+    // ── Google AI Studio (Gemini) call ──────────────────────────────────────
 
     private async Task<JsonObject> CallGeminiAsync(JsonArray contents)
     {
@@ -173,7 +171,6 @@ public class AdvisorService
             }
         };
 
-        // API key como query parameter — formato estándar de Google AI Studio
         var url = $"{_geminiEndpoint}?key={_apiKey}";
         var req = new HttpRequestMessage(HttpMethod.Post, url)
         {
