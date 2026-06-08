@@ -2,6 +2,8 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using MongoDB.Bson;
+using MongoDB.Bson.IO;
 using MongoDB.Driver;
 using anDora.Api.Data;
 using anDora.Api.Models.Advisor;
@@ -15,8 +17,24 @@ public class AdvisorService
     private readonly HttpClient _http;
     private readonly OperationsContext _ops;
     private readonly CatalogContext _catalog;
+    private readonly IMongoDatabase _db;
     private readonly string _geminiEndpoint;
     private const int MaxIterations = 8;
+
+    private static readonly HashSet<string> _allowedCollections = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "resumen_produccion_diaria_planta", "paros_no_programados", "resumen_mezclado_diario",
+        "resumen_precios_reales", "transacciones", "ordenes_compra_venta",
+        "resumen_diario_ordenes", "programa_ventas",
+        "cat_sitios", "cat_plantas", "cat_trabajadores", "cat_proveedores",
+        "cat_tanques", "cat_rutas", "cat_productos", "cat_corrientes",
+        "cat_precios", "vendedores", "cat_clientes"
+    };
+
+    private static readonly HashSet<string> _blockedPipelineStages = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "$out", "$merge", "$currentOp", "$listLocalSessions", "$listSessions"
+    };
 
     private const string SystemPrompt = """
         Eres anDora Advisor, el agente inteligente de análisis operacional de la plataforma anDora.
@@ -40,6 +58,7 @@ public class AdvisorService
         4. Detecta patrones, anomalías y sugiere oportunidades de mejora cuando sea relevante
         5. Responde en español (o el idioma que use el usuario); usa listas y tablas cuando ayuden
         6. Si el usuario pregunta por una planta específica, busca su clave en el catálogo primero
+        7. Para preguntas ad-hoc o análisis que las herramientas fijas no cubran, usa query_libre con el pipeline de agregación adecuado
         """;
 
     private readonly string? _apiKey;
@@ -48,6 +67,9 @@ public class AdvisorService
     {
         _ops    = ops;
         _catalog = catalog;
+
+        var mongoClient = new MongoClient(config["MongoSettings:ConnectionString"]);
+        _db = mongoClient.GetDatabase(config["MongoSettings:OperationsDb"]);
 
         _apiKey = config["Gemini:ApiKey"];
         var model = config["Gemini:Model"] ?? "gemini-1.5-flash";
@@ -203,6 +225,7 @@ public class AdvisorService
                 "query_compras"    => await QueryComprasAsync(input),
                 "query_ordenes"         => await QueryOrdenesAsync(input),
                 "query_programa_ventas" => await QueryProgramaVentasAsync(input),
+                "query_libre"           => await QueryLibreAsync(input),
                 _                       => $"Herramienta desconocida: {toolName}"
             };
         }
@@ -910,6 +933,117 @@ public class AdvisorService
         return JsonSerializer.Serialize(result);
     }
 
+    // ── Tool: Consulta libre ad-hoc ──────────────────────────────────────────
+
+    private async Task<string> QueryLibreAsync(JsonObject? input)
+    {
+        var coleccion    = input?["coleccion"]?.GetValue<string>() ?? "";
+        var filtroJson   = input?["filtro"]?.GetValue<string>();
+        var pipelineJson = input?["pipeline"]?.GetValue<string>();
+        var limite       = Math.Min(input?["limite"]?.GetValue<int>() ?? 50, 200);
+
+        if (!_allowedCollections.Contains(coleccion))
+            return $"Colección '{coleccion}' no permitida. Disponibles: {string.Join(", ", _allowedCollections.OrderBy(x => x))}";
+
+        var collection = _db.GetCollection<BsonDocument>(coleccion);
+
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(pipelineJson))
+            {
+                var wrapper = BsonDocument.Parse("{\"p\":" + pipelineJson + "}");
+                var stages  = wrapper["p"].AsBsonArray.OfType<BsonDocument>().ToList();
+
+                foreach (var stage in stages)
+                {
+                    var stageName = stage.Names.FirstOrDefault() ?? "";
+                    if (_blockedPipelineStages.Contains(stageName))
+                        return $"Etapa '{stageName}' no permitida por seguridad.";
+                }
+
+                if (!string.IsNullOrWhiteSpace(filtroJson))
+                {
+                    var matchDoc = BsonDocument.Parse(filtroJson);
+                    ConvertIsoDatesToBson(matchDoc);
+                    stages.Insert(0, new BsonDocument("$match", matchDoc));
+                }
+
+                if (!stages.Any(s => s.Names.FirstOrDefault() == "$limit"))
+                    stages.Add(new BsonDocument("$limit", limite));
+
+                var cursor = await collection.AggregateAsync<BsonDocument>(stages.ToArray());
+                var aggDocs = await cursor.ToListAsync();
+                return aggDocs.Count > 0 ? BsonListToJson(aggDocs) : "Sin resultados.";
+            }
+            else
+            {
+                var filter = string.IsNullOrWhiteSpace(filtroJson)
+                    ? new BsonDocument()
+                    : BsonDocument.Parse(filtroJson);
+                ConvertIsoDatesToBson(filter);
+
+                var docs = await collection.Find(filter).Limit(limite).ToListAsync();
+                return docs.Count > 0 ? BsonListToJson(docs) : "Sin resultados para los filtros indicados.";
+            }
+        }
+        catch (Exception ex)
+        {
+            return $"Error en consulta libre: {ex.Message}";
+        }
+    }
+
+    private static void ConvertIsoDatesToBson(BsonDocument doc)
+    {
+        foreach (var key in doc.Names.ToList())
+        {
+            var val = doc[key];
+            if (val is BsonString s && TryParseIsoDate(s.Value, out var dt))
+                doc[key] = new BsonDateTime(dt);
+            else if (val is BsonDocument nested)
+                ConvertIsoDatesToBson(nested);
+            else if (val is BsonArray arr)
+                ConvertIsoDatesToBson(arr);
+        }
+    }
+
+    private static void ConvertIsoDatesToBson(BsonArray arr)
+    {
+        for (int i = 0; i < arr.Count; i++)
+        {
+            if (arr[i] is BsonString s && TryParseIsoDate(s.Value, out var dt))
+                arr[i] = new BsonDateTime(dt);
+            else if (arr[i] is BsonDocument doc)
+                ConvertIsoDatesToBson(doc);
+            else if (arr[i] is BsonArray nested)
+                ConvertIsoDatesToBson(nested);
+        }
+    }
+
+    private static bool TryParseIsoDate(string s, out DateTime dt)
+    {
+        dt = default;
+        return s.Length >= 10 && DateTime.TryParseExact(
+            s, ["yyyy-MM-dd", "yyyy-MM-ddTHH:mm:ssZ", "yyyy-MM-ddTHH:mm:ss.fffZ"],
+            System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal,
+            out dt);
+    }
+
+    private static string BsonListToJson(List<BsonDocument> docs)
+    {
+        var settings = new JsonWriterSettings { OutputMode = JsonOutputMode.RelaxedExtendedJson };
+        var sb = new StringBuilder("[");
+        for (int i = 0; i < docs.Count; i++)
+        {
+            if (i > 0) sb.Append(',');
+            var d = docs[i].DeepClone().AsBsonDocument;
+            if (d.Contains("_id")) d.Remove("_id");
+            sb.Append(d.ToJson(settings));
+        }
+        sb.Append(']');
+        return sb.ToString();
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     private static DateTime ParseDate(string? value, DateTime defaultValue)
@@ -1065,6 +1199,39 @@ public class AdvisorService
                     fecha_fin    = new { type = "STRING", description = "Fecha fin YYYY-MM-DD. Default: hoy." },
                     agrupar_por  = new { type = "STRING", description = "Agrupación: dia | semana | mes. Default: dia." }
                 }
+            }
+        },
+        new
+        {
+            name = "query_libre",
+            description = "Consulta ad-hoc libre contra cualquier colección de MongoDB Atlas. Úsala cuando necesites lógica de filtrado o agrupación no cubierta por las otras herramientas. Puedes especificar un filtro simple o un pipeline de agregación completo.",
+            parameters = new
+            {
+                type = "OBJECT",
+                properties = new
+                {
+                    coleccion = new
+                    {
+                        type = "STRING",
+                        description = "Nombre exacto de la colección. Opciones de operaciones: resumen_produccion_diaria_planta, paros_no_programados, resumen_mezclado_diario, resumen_precios_reales, transacciones, ordenes_compra_venta, resumen_diario_ordenes, programa_ventas. Opciones de catálogo: cat_plantas, cat_productos, cat_clientes, vendedores, cat_proveedores, cat_corrientes, cat_rutas, cat_tanques, cat_sitios, cat_precios, cat_trabajadores."
+                    },
+                    filtro = new
+                    {
+                        type = "STRING",
+                        description = "Filtro MongoDB como JSON string. Las fechas deben estar en formato 'YYYY-MM-DD'. Ej: '{\"tipo\":\"venta\",\"fecha\":{\"$gte\":\"2025-01-01\"}}'. Si también proporcionas pipeline, este filtro se agrega como primer $match automáticamente."
+                    },
+                    pipeline = new
+                    {
+                        type = "STRING",
+                        description = "Pipeline de agregación como JSON array string. Etapas permitidas: $match $group $project $sort $limit $skip $unwind $addFields $lookup $count $sortByCount $bucket $facet $replaceRoot $set $unset. Ej: '[{\"$group\":{\"_id\":\"$planta_clave\",\"total_kg\":{\"$sum\":\"$cantidad_kg\"}}},{\"$sort\":{\"total_kg\":-1}}]'."
+                    },
+                    limite = new
+                    {
+                        type = "NUMBER",
+                        description = "Máximo de documentos a retornar. Default: 50, máximo: 200."
+                    }
+                },
+                required = new[] { "coleccion" }
             }
         }
     ];
