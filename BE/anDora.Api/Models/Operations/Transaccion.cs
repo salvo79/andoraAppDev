@@ -95,4 +95,13 @@ public class Transaccion
 
     [BsonElement("estatus")]
     public string Estatus { get; set; } = default!;  // "entregada" | "facturada"
+
+    [BsonElement("vendedor_codigo")]
+    public string? VendedorCodigo { get; set; }
+
+    [BsonElement("vendedor_nombre")]
+    public string? VendedorNombre { get; set; }
+
+    [BsonElement("canal")]
+    public string? Canal { get; set; }
 }

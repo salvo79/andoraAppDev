@@ -59,6 +59,13 @@ public class AdvisorService
         5. Responde en español (o el idioma que use el usuario); usa listas y tablas cuando ayuden
         6. Si el usuario pregunta por una planta específica, busca su clave en el catálogo primero
         7. Para preguntas ad-hoc o análisis que las herramientas fijas no cubran, usa query_libre con el pipeline de agregación adecuado
+        8. Usa tablas Markdown (| Col | Col |\n|---|---|\n| val | val |) cuando los datos tengan más de 3 campos o filas; el frontend las renderiza
+        9. Cuando el usuario pida una gráfica o los datos se vean mejor visualmente, incluye un bloque ```chart con config JSON de Chart.js:
+           ```chart
+           {"type":"bar","data":{"labels":[...],"datasets":[{"label":"...","data":[...]}]}}
+           ```
+           Tipos disponibles: bar, line, pie, doughnut. Usa números sin formato MXN en data (el frontend aplica estilos).
+        10. Para ventas por año usa query_ventas con agrupar_por:"anio"; para por vendedor usa agrupar_por:"vendedor"; para por canal usa agrupar_por:"canal"
         """;
 
     private readonly string? _apiKey;
@@ -682,12 +689,16 @@ public class AdvisorService
 
     private async Task<string> QueryVentasAsync(JsonObject? input)
     {
-        var fechaInicio  = ParseDate(input?["fecha_inicio"]?.GetValue<string>(), DateTime.UtcNow.AddDays(-30));
-        var fechaFin     = ParseDate(input?["fecha_fin"]?.GetValue<string>(),    DateTime.UtcNow);
         var agruparPor   = input?["agrupar_por"]?.GetValue<string>() ?? "producto";
+        var defaultStart = agruparPor == "anio" ? DateTime.UtcNow.AddYears(-5) : DateTime.UtcNow.AddDays(-30);
+        var fechaInicio  = ParseDate(input?["fecha_inicio"]?.GetValue<string>(), defaultStart);
+        var fechaFin     = ParseDate(input?["fecha_fin"]?.GetValue<string>(),    DateTime.UtcNow);
         var clienteNombre= input?["cliente_nombre"]?.GetValue<string>();
         var productoCod  = input?["producto_codigo"]?.GetValue<string>();
         var estatus      = input?["estatus"]?.GetValue<string>();
+        var vendedorCod  = input?["vendedor_codigo"]?.GetValue<string>();
+        var canal        = input?["canal"]?.GetValue<string>();
+        var anioFiltro   = input?["anio"] != null ? (int?)input["anio"]!.GetValue<int>() : null;
 
         var fb = Builders<Transaccion>.Filter;
         var filter = fb.And(
@@ -701,6 +712,12 @@ public class AdvisorService
             filter &= fb.Eq(x => x.ProductoCodigo, productoCod);
         if (!string.IsNullOrWhiteSpace(estatus))
             filter &= fb.Eq(x => x.Estatus, estatus);
+        if (!string.IsNullOrWhiteSpace(vendedorCod))
+            filter &= fb.Eq(x => x.VendedorCodigo, vendedorCod);
+        if (!string.IsNullOrWhiteSpace(canal))
+            filter &= fb.Eq(x => x.Canal, canal);
+        if (anioFiltro.HasValue)
+            filter &= fb.Eq(x => x.Anio, anioFiltro.Value);
 
         var docs = await _ops.Transacciones.Find(filter).ToListAsync();
         if (!docs.Any()) return "Sin ventas para los filtros indicados.";
@@ -751,6 +768,52 @@ public class AdvisorService
                     margen_mxn         = Math.Round(g.Sum(x => x.MargenMxn), 0)
                 })
                 .OrderByDescending(x => x.num_ordenes).ToList(),
+
+            "anio" => docs
+                .GroupBy(d => d.Anio)
+                .Select(g => new
+                {
+                    anio               = g.Key,
+                    num_ordenes        = g.Count(),
+                    total_cantidad_ton = Math.Round(g.Sum(x => x.Cantidad), 2),
+                    ingresos_mxn       = Math.Round(g.Sum(x => x.TotalMxn), 0),
+                    costo_total_mxn    = Math.Round(g.Sum(x => x.CostoTotal), 0),
+                    margen_mxn         = Math.Round(g.Sum(x => x.MargenMxn), 0),
+                    margen_promedio_pct= Math.Round(g.Average(x => x.MargenPct), 2),
+                    clientes_distintos = g.Select(x => x.ClienteCodigo).Distinct().Count()
+                })
+                .OrderBy(x => x.anio).ToList(),
+
+            "vendedor" => docs
+                .GroupBy(d => new { Codigo = d.VendedorCodigo ?? "SIN", Nombre = d.VendedorNombre ?? "Sin vendedor" })
+                .Select(g => new
+                {
+                    vendedor_codigo    = g.Key.Codigo,
+                    vendedor_nombre    = g.Key.Nombre,
+                    num_ordenes        = g.Count(),
+                    total_cantidad_ton = Math.Round(g.Sum(x => x.Cantidad), 2),
+                    ingresos_mxn       = Math.Round(g.Sum(x => x.TotalMxn), 0),
+                    costo_total_mxn    = Math.Round(g.Sum(x => x.CostoTotal), 0),
+                    margen_mxn         = Math.Round(g.Sum(x => x.MargenMxn), 0),
+                    margen_promedio_pct= Math.Round(g.Average(x => x.MargenPct), 2),
+                    clientes_distintos = g.Select(x => x.ClienteCodigo).Distinct().Count()
+                })
+                .OrderByDescending(x => x.ingresos_mxn).Take(30).ToList(),
+
+            "canal" => docs
+                .GroupBy(d => d.Canal ?? "sin_canal")
+                .Select(g => new
+                {
+                    canal              = g.Key,
+                    num_ordenes        = g.Count(),
+                    total_cantidad_ton = Math.Round(g.Sum(x => x.Cantidad), 2),
+                    ingresos_mxn       = Math.Round(g.Sum(x => x.TotalMxn), 0),
+                    costo_total_mxn    = Math.Round(g.Sum(x => x.CostoTotal), 0),
+                    margen_mxn         = Math.Round(g.Sum(x => x.MargenMxn), 0),
+                    margen_promedio_pct= Math.Round(g.Average(x => x.MargenPct), 2),
+                    clientes_distintos = g.Select(x => x.ClienteCodigo).Distinct().Count()
+                })
+                .OrderByDescending(x => x.ingresos_mxn).ToList(),
 
             _ => // "producto" (default)
                 docs
@@ -1154,15 +1217,18 @@ public class AdvisorService
         new
         {
             name = "query_ventas",
-            description = "Consulta transacciones de venta: ingresos, margen, cantidad despachada, descuentos y flete por producto, cliente, mes o estatus.",
+            description = "Consulta transacciones de venta reales: ingresos, margen, cantidad, descuentos y flete. Soporta agrupación por año, vendedor, canal, producto, cliente, mes o estatus.",
             parameters = new
             {
                 type = "OBJECT",
                 properties = new
                 {
-                    fecha_inicio    = new { type = "STRING", description = "Fecha inicio YYYY-MM-DD. Default: hace 30 días." },
+                    fecha_inicio    = new { type = "STRING", description = "Fecha inicio YYYY-MM-DD. Default: hace 30 días (hace 5 años si agrupar_por es anio)." },
                     fecha_fin       = new { type = "STRING", description = "Fecha fin YYYY-MM-DD. Default: hoy." },
-                    agrupar_por     = new { type = "STRING", description = "Agrupación: producto | cliente | mes | estatus. Default: producto." },
+                    agrupar_por     = new { type = "STRING", description = "Agrupación: anio | vendedor | canal | producto | cliente | mes | estatus. Default: producto." },
+                    anio            = new { type = "NUMBER", description = "Filtrar por año exacto (ej: 2024)." },
+                    vendedor_codigo = new { type = "STRING", description = "Filtrar por código exacto del vendedor." },
+                    canal           = new { type = "STRING", description = "Filtrar por canal: directo | distribuidor | exportacion | mostrador." },
                     cliente_nombre  = new { type = "STRING", description = "Filtro por nombre o fragmento del cliente." },
                     producto_codigo = new { type = "STRING", description = "Filtro por código exacto del producto." },
                     estatus         = new { type = "STRING", description = "Estatus: entregada | facturada." }

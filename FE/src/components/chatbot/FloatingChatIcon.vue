@@ -87,112 +87,201 @@
 </template>
 
 <script setup>
-import { ref, nextTick, watch } from 'vue';
+import { ref, nextTick, watch, onUnmounted } from 'vue';
+import Chart from 'chart.js/auto';
 import { advisorService } from '@/service/advisorService';
 
 const isOpen   = ref(false);
 const isTyping = ref(false);
 const draft    = ref('');
 const unread   = ref(0);
-const messages = ref([]);  // { role: 'user'|'assistant', content: string, ts: Date }
+const messages = ref([]);
 const messagesEl = ref(null);
 const inputEl    = ref(null);
 
+// Chart.js state (plain objects — no reactivity needed)
+const chartConfigs   = {};   // chartId -> config string (populated during renderMarkdown)
+const chartInstances = {};   // chartId -> Chart instance
+
+const CHART_PALETTE = ['#2563eb','#10b981','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#ec4899','#84cc16'];
+
+let blockSeq = 0;
+
 const suggestions = [
-  '¿Cuál planta tuvo más producción el último mes?',
-  '¿Cuáles son las principales causas de paros?',
-  '¿Qué producto tiene el mejor margen?',
-  'Muestra el resumen de calidad por planta',
+  '¿Cuáles son las ventas por año?',
+  '¿Qué vendedor tuvo más ventas? Muestra gráfica',
+  '¿Cuáles son ventas por canal de venta?',
+  '¿Cuál cliente generó más margen? Muestra tabla',
 ];
 
 function toggleChat() {
   isOpen.value = !isOpen.value;
   if (isOpen.value) {
     unread.value = 0;
-    nextTick(() => {
-      scrollToBottom();
-      inputEl.value?.focus();
-    });
+    nextTick(() => { scrollToBottom(); inputEl.value?.focus(); });
   }
 }
 
 async function sendMessage() {
   const text = draft.value.trim();
   if (!text || isTyping.value) return;
-
   draft.value = '';
   autoResize();
-
   messages.value.push({ role: 'user', content: text, ts: new Date() });
   scrollToBottom();
-
   isTyping.value = true;
   try {
-    // Construir historial sin timestamps (solo role + content)
-    const history = messages.value
-      .slice(0, -1)  // excluir el mensaje que acaba de agregar
-      .map(m => ({ role: m.role, content: m.content }));
-
+    const history = messages.value.slice(0, -1).map(m => ({ role: m.role, content: m.content }));
     const reply = await advisorService.chat(text, history);
-
     messages.value.push({ role: 'assistant', content: reply, ts: new Date() });
-
     if (!isOpen.value) unread.value++;
   } catch (err) {
-    messages.value.push({
-      role: 'assistant',
-      content: `Error al conectar con el advisor: ${err.message}`,
-      ts: new Date()
-    });
+    messages.value.push({ role: 'assistant', content: `Error al conectar con el advisor: ${err.message}`, ts: new Date() });
   } finally {
     isTyping.value = false;
     nextTick(scrollToBottom);
   }
 }
 
-function sendSuggestion(text) {
-  draft.value = text;
-  sendMessage();
-}
-
-function scrollToBottom() {
-  if (messagesEl.value)
-    messagesEl.value.scrollTop = messagesEl.value.scrollHeight;
-}
-
+function sendSuggestion(text) { draft.value = text; sendMessage(); }
+function scrollToBottom() { if (messagesEl.value) messagesEl.value.scrollTop = messagesEl.value.scrollHeight; }
 function autoResize() {
   if (!inputEl.value) return;
   inputEl.value.style.height = 'auto';
   inputEl.value.style.height = Math.min(inputEl.value.scrollHeight, 120) + 'px';
 }
-
 function formatTime(date) {
   return date?.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' }) ?? '';
 }
 
-// Convierte markdown básico a HTML seguro (sin dependencias extra)
+// ── Markdown renderer with table + chart support ──────────────────────────
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function buildTableHtml(lines) {
+  const parseRow = l => l.split('|').filter((_,i,a) => i>0 && i<a.length-1).map(c => c.trim());
+  const headers = parseRow(lines[0]).map(h => `<th>${escHtml(h)}</th>`).join('');
+  const rows = lines.slice(2)
+    .filter(l => l.trim())
+    .map(l => `<tr>${parseRow(l).map(c => `<td>${escHtml(c)}</td>`).join('')}</tr>`)
+    .join('');
+  return `<table class="advisor-table"><thead><tr>${headers}</tr></thead><tbody>${rows}</tbody></table>`;
+}
+
 function renderMarkdown(text) {
   if (!text) return '';
-  return text
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    // bloques de código
-    .replace(/```[\s\S]*?```/g, m => `<pre><code>${m.slice(3, -3).trim()}</code></pre>`)
-    // negrita e itálica
+
+  const specials = {};  // placeholder -> html
+
+  // 1. Extract ```chart blocks (before HTML escaping)
+  text = text.replace(/```chart\n?([\s\S]+?)\n?```/g, (_, cfg) => {
+    const key = `__BLK${++blockSeq}__`;
+    const cid = `advchart_${blockSeq}`;
+    chartConfigs[cid] = cfg.trim();
+    specials[key] = `<div class="advisor-chart-wrap"><canvas id="${cid}"></canvas></div>`;
+    return key;
+  });
+
+  // 2. Extract markdown tables (before HTML escaping)
+  const lines = text.split('\n');
+  const processedLines = [];
+  let tbl = [];
+
+  const flushTable = () => {
+    if (tbl.length >= 2 && /^\|[\s|:-]+\|$/.test(tbl[1])) {
+      const key = `__BLK${++blockSeq}__`;
+      specials[key] = buildTableHtml(tbl);
+      processedLines.push(key);
+    } else {
+      processedLines.push(...tbl);
+    }
+    tbl = [];
+  };
+
+  for (const line of lines) {
+    if (line.startsWith('|') && line.endsWith('|')) {
+      tbl.push(line);
+    } else {
+      if (tbl.length) flushTable();
+      processedLines.push(line);
+    }
+  }
+  if (tbl.length) flushTable();
+  text = processedLines.join('\n');
+
+  // 3. Standard markdown → HTML (escaping safe since placeholders have no special chars)
+  let html = text
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/```[\s\S]*?```/g, m => `<pre><code>${m.slice(3,-3).trim()}</code></pre>`)
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
-    // encabezados h3 / h2
     .replace(/^### (.+)$/gm, '<h3>$1</h3>')
     .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-    // listas sin ordenar
     .replace(/^[-•] (.+)$/gm, '<li>$1</li>')
     .replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>')
-    // saltos de línea
     .replace(/\n{2,}/g, '</p><p>')
     .replace(/\n/g, '<br>')
     .replace(/^(.+)$/, '<p>$1</p>');
+
+  // 4. Restore specials
+  for (const [key, specialHtml] of Object.entries(specials)) {
+    html = html.replaceAll(key, specialHtml);
+  }
+  return html;
 }
 
-watch(messages, () => { nextTick(scrollToBottom); });
+// ── Chart initialization ──────────────────────────────────────────────────
+
+function applyChartDefaults(cfg) {
+  cfg.options ??= {};
+  cfg.options.responsive = true;
+  cfg.options.maintainAspectRatio = false;
+  cfg.options.plugins ??= {};
+  cfg.options.plugins.legend ??= { position: 'bottom', labels: { font: { size: 11 } } };
+
+  cfg.data?.datasets?.forEach((ds, i) => {
+    if (ds.backgroundColor) return;
+    const color = CHART_PALETTE[i % CHART_PALETTE.length];
+    if (cfg.type === 'line') {
+      ds.backgroundColor = color + '33';
+      ds.borderColor = color;
+      ds.tension ??= 0.3;
+      ds.pointRadius ??= 3;
+    } else if (cfg.type === 'pie' || cfg.type === 'doughnut') {
+      ds.backgroundColor = CHART_PALETTE.slice(0, ds.data?.length ?? CHART_PALETTE.length);
+    } else {
+      ds.backgroundColor = color;
+    }
+  });
+}
+
+async function initPendingCharts() {
+  await nextTick();
+  for (const [cid, cfgStr] of Object.entries(chartConfigs)) {
+    if (chartInstances[cid]) continue;
+    const canvas = document.getElementById(cid);
+    if (!canvas) continue;
+    try {
+      const cfg = JSON.parse(cfgStr);
+      applyChartDefaults(cfg);
+      chartInstances[cid] = new Chart(canvas, cfg);
+    } catch (e) {
+      console.warn('Advisor chart error:', cid, e);
+    }
+  }
+}
+
+watch(messages, async () => {
+  await nextTick();
+  scrollToBottom();
+  initPendingCharts();
+});
+
+onUnmounted(() => {
+  Object.values(chartInstances).forEach(c => c.destroy());
+});
 </script>
 
 <style scoped>
@@ -406,4 +495,41 @@ watch(messages, () => { nextTick(scrollToBottom); });
 .advisor-slide-leave-active { transition: all .25s cubic-bezier(.4,0,.2,1); }
 .advisor-slide-enter-from,
 .advisor-slide-leave-to   { opacity: 0; transform: translateY(16px) scale(.97); }
+
+/* ── Tables ──────────────────────────────────────────────────────────── */
+.advisor-msg-bubble :deep(.advisor-table) {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  margin: 6px 0;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.advisor-msg-bubble :deep(.advisor-table th) {
+  background: #dbeafe;
+  color: #1e40af;
+  padding: 5px 8px;
+  text-align: left;
+  font-weight: 600;
+  border-bottom: 2px solid #bfdbfe;
+}
+.advisor-msg-bubble :deep(.advisor-table td) {
+  padding: 4px 8px;
+  border-bottom: 1px solid #e5e7eb;
+  color: #374151;
+}
+.advisor-msg-bubble :deep(.advisor-table tr:nth-child(even) td) {
+  background: #f9fafb;
+}
+
+/* ── Charts ──────────────────────────────────────────────────────────── */
+.advisor-msg-bubble :deep(.advisor-chart-wrap) {
+  position: relative;
+  height: 220px;
+  margin: 8px 0;
+  background: #fff;
+  border-radius: 8px;
+  padding: 4px;
+  border: 1px solid #e5e7eb;
+}
 </style>
