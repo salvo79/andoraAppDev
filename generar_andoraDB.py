@@ -281,6 +281,8 @@ inventario_actual = dict(inv_inicial)
 
 # Acumuladores por lote mensual
 lote_num = 0
+tx_seq  = 0   # folio único para transacciones
+ml_seq  = 0   # folio único para movimientos_logisticos
 
 # Buffers de inserción
 BUF = {
@@ -291,7 +293,6 @@ BUF = {
     "resumen_operaciones_almacen":      [],
     "resumen_diario_ordenes":           [],
     "transacciones":                    [],
-    "inventario":                       [],
     "lotes_produccion":                 [],
     "cierres_diarios":                  [],
     "balance_materia_almacen":          [],
@@ -552,22 +553,6 @@ for dia_idx in range(total_dias):
         inv_nue = round(inv_ant + prod_neta_kg, 3)
         inventario_actual[pf_id] = inv_nue
 
-        BUF["inventario"].append({
-            "_id":           ObjectId(),
-            "fecha":         fecha,
-            "planta_id":     pid_planta,
-            "planta_clave":  p_clave,
-            "producto_id":   pf_id,
-            "producto_codigo": pf_codigo,
-            "producto_nombre": pf_nombre,
-            "stock_inicial_kg": round(inv_ant, 3),
-            "produccion_kg":    prod_neta_kg,
-            "despacho_kg":      0,    # se actualiza en ventas
-            "stock_final_kg":   inv_nue,
-            "unidad":          "kg",
-            "created_at":      fecha,
-        })
-
         # ── Trazabilidad (un registro por lote) ──────────────────────
         BUF["trazabilidad_produccion"].append({
             "_id":           ObjectId(),
@@ -664,11 +649,15 @@ for dia_idx in range(total_dias):
         kg_desp = round(cantidad_ton * 1000, 3)
         inventario_actual[pv_id] = max(0, inventario_actual.get(pv_id, 0) - kg_desp)
 
+        tx_seq += 1
         tx_id = ObjectId()
+        tx_folio = f"VTA-{fecha.year}{fecha.month:02d}-{tx_seq:06d}"
         BUF["transacciones"].append({
             "_id":              tx_id,
+            "folio":            tx_folio,
             "tipo":             "venta",
             "fecha":            fecha,
+            "fecha_dia":        fecha,
             "anio":             anio,
             "mes":              mes,
             "semana":           sem,
@@ -735,10 +724,13 @@ for dia_idx in range(total_dias):
         })
 
         # Movimiento logístico
+        ml_seq += 1
         BUF["movimientos_logisticos"].append({
             "_id":              ObjectId(),
+            "folio":            f"ML-{fecha.year}{fecha.month:02d}-{ml_seq:06d}",
             "transaccion_id":   tx_id,
             "fecha":            fecha,
+            "fecha_dia":        fecha,
             "tipo":             "salida",
             "producto_id":      pv_id,
             "producto_codigo":  pv_cod,
@@ -860,6 +852,9 @@ for dia_idx in range(total_dias):
     BUF["cierres_diarios"].append({
         "_id":              ObjectId(),
         "fecha":            fecha,
+        "fecha_dia":        fecha,
+        "tipo_operacion":   "cierre",
+        "tipo_objeto":      "diario",
         "anio":             anio,
         "mes":              mes,
         "company_id":       company_id,
@@ -895,7 +890,6 @@ cols_check = [
     "resumen_operaciones_almacen",
     "resumen_diario_ordenes",
     "transacciones",
-    "inventario",
     "lotes_produccion",
     "cierres_diarios",
     "balance_materia_almacen",
