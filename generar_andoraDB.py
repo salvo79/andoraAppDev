@@ -16,16 +16,21 @@
 =======================================================================
 """
 
-import math, random, sys
+import math, random, sys, os
 from datetime import datetime, timedelta, timezone
 from bson import ObjectId
 from pymongo import MongoClient, InsertOne, UpdateOne
 from pymongo.errors import BulkWriteError
 
 # ── Conexión ────────────────────────────────────────────────────────
+# Usar variable de entorno MONGO_URI para conectar a Atlas:
+#   export MONGO_URI="mongodb+srv://user:pass@cluster.mongodb.net/?appName=app"
+#   python3 generar_andoraDB.py
+MONGO_URI = os.environ.get("MONGO_URI", "mongodb://localhost:27017")
 try:
-    client = MongoClient("mongodb://localhost:27017", serverSelectionTimeoutMS=5000)
+    client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=10000)
     client.server_info()
+    print(f"✅  Conectado a: {'Atlas' if 'mongodb+srv' in MONGO_URI else 'localhost'}")
 except Exception as e:
     sys.exit(f"❌  No se pudo conectar a MongoDB: {e}")
 

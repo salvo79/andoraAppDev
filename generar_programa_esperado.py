@@ -28,21 +28,24 @@
 =======================================================================
 """
 
-import sys, math, hashlib
+import sys, math, hashlib, os
 from datetime import datetime, timedelta, timezone, date
 from calendar import monthrange
 from bson import ObjectId
 from pymongo import MongoClient
 
 # ── Conexión ──────────────────────────────────────────────────────────
+# Usar variable de entorno MONGO_URI para conectar a Atlas:
+#   export MONGO_URI="mongodb+srv://user:pass@cluster.mongodb.net/?appName=app"
+MONGO_URI = os.environ.get("MONGO_URI", "mongodb://localhost:27017")
 try:
-    client = MongoClient("mongodb://localhost:27017", serverSelectionTimeoutMS=5000)
+    client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=10000)
     client.server_info()
+    print(f"✅  Conectado a: {'Atlas' if 'mongodb+srv' in MONGO_URI else 'localhost'}")
 except Exception as e:
     sys.exit(f"❌  No se pudo conectar a MongoDB: {e}")
 
 db = client["andoraDB"]
-print("✅  Conectado a andoraDB")
 
 # ── Catálogos ─────────────────────────────────────────────────────────
 print("\n📚  Leyendo catálogos...")

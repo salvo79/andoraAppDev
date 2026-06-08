@@ -34,6 +34,7 @@ import random, sys, math
 from datetime import datetime, timedelta, timezone, date
 from collections import defaultdict
 from bson import ObjectId
+import os
 from pymongo import MongoClient, UpdateOne
 
 SEED_PAROS = 77          # semilla fija → resultados reproducibles
@@ -44,14 +45,15 @@ PROB_EXTRA_SKIP  = 0.025 # +2.5 % si el mantenimiento fue omitido en <30 días
 CUMPLIMIENTO_PCT = 0.75  # 75 % de mantenimientos preventivos ejecutados
 
 # ── Conexión ──────────────────────────────────────────────────────────
+MONGO_URI = os.environ.get("MONGO_URI", "mongodb://localhost:27017")
 try:
-    client = MongoClient("mongodb://localhost:27017", serverSelectionTimeoutMS=5000)
+    client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=10000)
     client.server_info()
+    print(f"✅  Conectado a: {'Atlas' if 'mongodb+srv' in MONGO_URI else 'localhost'}")
 except Exception as e:
     sys.exit(f"❌  No se pudo conectar a MongoDB: {e}")
 
 db = client["andoraDB"]
-print("✅  Conectado a andoraDB")
 
 # ── Leer catálogos ────────────────────────────────────────────────────
 print("\n📚  Leyendo catálogos y datos existentes...")

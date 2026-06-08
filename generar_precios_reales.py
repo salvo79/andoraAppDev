@@ -15,17 +15,19 @@
 
 import math, random, sys
 from datetime import datetime, timezone
+import os
 from bson import ObjectId
 from pymongo import MongoClient
 
+MONGO_URI = os.environ.get("MONGO_URI", "mongodb://localhost:27017")
 try:
-    client = MongoClient("mongodb://localhost:27017", serverSelectionTimeoutMS=5000)
+    client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=10000)
     client.server_info()
+    print(f"✅  Conectado a: {'Atlas' if 'mongodb+srv' in MONGO_URI else 'localhost'}\n")
 except Exception as e:
     sys.exit(f"❌  No se pudo conectar a MongoDB: {e}")
 
 db = client["andoraDB"]
-print("✅  Conectado a andoraDB\n")
 random.seed(2020)
 
 # ── Catálogos ────────────────────────────────────────────────────────
