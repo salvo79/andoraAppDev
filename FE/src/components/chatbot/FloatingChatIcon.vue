@@ -100,8 +100,9 @@ const messagesEl = ref(null);
 const inputEl    = ref(null);
 
 // Chart.js state (plain objects — no reactivity needed)
-const chartConfigs   = {};   // chartId -> config string (populated during renderMarkdown)
+const chartConfigs   = {};   // chartId -> config string
 const chartInstances = {};   // chartId -> Chart instance
+const htmlCache      = new Map(); // message content -> rendered html (ensures stable canvas ids)
 
 const CHART_PALETTE = ['#2563eb','#10b981','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#ec4899','#84cc16'];
 
@@ -172,6 +173,8 @@ function buildTableHtml(lines) {
 
 function renderMarkdown(text) {
   if (!text) return '';
+  if (htmlCache.has(text)) return htmlCache.get(text);
+  const cacheKey = text;
 
   const specials = {};  // placeholder -> html
 
@@ -229,6 +232,7 @@ function renderMarkdown(text) {
   for (const [key, specialHtml] of Object.entries(specials)) {
     html = html.replaceAll(key, specialHtml);
   }
+  htmlCache.set(cacheKey, html);
   return html;
 }
 
@@ -257,8 +261,7 @@ function applyChartDefaults(cfg) {
   });
 }
 
-async function initPendingCharts() {
-  await nextTick();
+function initPendingCharts() {
   for (const [cid, cfgStr] of Object.entries(chartConfigs)) {
     if (chartInstances[cid]) continue;
     const canvas = document.getElementById(cid);
@@ -273,11 +276,10 @@ async function initPendingCharts() {
   }
 }
 
-watch(messages, async () => {
-  await nextTick();
+watch(messages, () => {
   scrollToBottom();
   initPendingCharts();
-});
+}, { deep: true, flush: 'post' });
 
 onUnmounted(() => {
   Object.values(chartInstances).forEach(c => c.destroy());
