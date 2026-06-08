@@ -3,22 +3,35 @@ using MongoDB.Bson.Serialization.Attributes;
 
 namespace anDora.Api.Models.Catalog
 {
+    [BsonIgnoreExtraElements]
     public class Planta
     {
         [BsonId]
         [BsonRepresentation(BsonType.ObjectId)]
         public string? Id { get; set; }
 
+        [BsonElement("clave")]
         public string Clave { get; set; } = "";
-        public string Nombre { get; set; } = "";
-        public string? SitioId { get; set; }
-        public string? SitioNombre { get; set; }
-        public string? Tipo { get; set; }          // Producción, Mezclado, Almacén
-        public double? CapacidadTon { get; set; }
-        public string? Unidad { get; set; }        // Ton, Kg, Lt
-        public bool Activo { get; set; } = true;
 
-        [BsonDateTimeOptions(Kind = DateTimeKind.Utc)]
-        public DateTime CreadoEn { get; set; } = DateTime.UtcNow;
+        [BsonElement("nombre")]
+        public string Nombre { get; set; } = "";
+
+        [BsonElement("tipo_equipo")]
+        public string? Tipo { get; set; }
+
+        [BsonElement("site_id")]
+        public string? SitioId { get; set; }
+
+        [BsonElement("site_nombre")]
+        public string? SitioNombre { get; set; }
+
+        [BsonElement("grupo_nombre")]
+        public string? GrupoNombre { get; set; }
+
+        [BsonElement("estatus")]
+        public string? Estatus { get; set; }
+
+        public double? CapacidadTon { get; set; }
+        public string? Unidad { get; set; }
     }
 }

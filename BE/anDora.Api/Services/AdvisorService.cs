@@ -463,27 +463,27 @@ public class AdvisorService
         object result = tipo switch
         {
             "plantas" => (await _catalog.Plantas.Find(_ => true).ToListAsync())
-                .Select(p => new { id = p.Id, clave = p.Clave, nombre = p.Nombre, tipo = p.Tipo, capacidad_ton = p.CapacidadTon, unidad = p.Unidad })
+                .Select(p => new { id = p.Id, clave = p.Clave, nombre = p.Nombre, tipo_equipo = p.Tipo, grupo = p.GrupoNombre, sitio = p.SitioNombre, estatus = p.Estatus })
                 .ToList(),
 
-            "productos" => (await _catalog.Productos.Find(_ => true).ToListAsync())
-                .Select(p => new { id = p.Id, clave = p.Clave, nombre = p.Nombre, categoria = p.Categoria, unidad = p.Unidad, es_producto_final = p.EsProductoFinal })
+            "productos" => (await _catalog.Corrientes.Find(c => c.EsProductoFinal).ToListAsync())
+                .Select(c => new { id = c.Id, clave = c.Clave, sku = c.Sku, nombre = c.Nombre, unidad = c.Unidad, precio_lista = c.PrecioLista, costo_produccion = c.CostoProduccion, es_producto_final = true })
                 .ToList(),
 
             "corrientes" => (await _catalog.Corrientes.Find(_ => true).ToListAsync())
-                .Select(c => new { id = c.Id, clave = c.Clave, nombre = c.Nombre, tipo_corriente = c.TipoCorriente, unidad = c.Unidad })
+                .Select(c => new { id = c.Id, clave = c.Clave, nombre = c.Nombre, tipo_corriente = c.TipoCorriente, unidad = c.Unidad, es_producto_final = c.EsProductoFinal })
                 .ToList(),
 
             "proveedores" => (await _catalog.Proveedores.Find(_ => true).ToListAsync())
-                .Select(p => new { id = p.Id, clave = p.Clave, nombre = p.Nombre, tipo_servicio = p.TipoServicio, contacto = p.Contacto })
+                .Select(p => new { id = p.Id, clave = p.Clave, nombre = p.Nombre, nombre_comercial = p.NombreComercial, tipo_servicio = p.TipoServicio })
                 .ToList(),
 
             "sitios" => (await _catalog.Sitios.Find(_ => true).ToListAsync())
-                .Select(s => new { id = s.Id, clave = s.Clave, nombre = s.Nombre, estado = s.Estado, ubicacion = s.Ubicacion })
+                .Select(s => new { id = s.Id, clave = s.Clave, nombre = s.Nombre, tipo_site = s.TipoSite, estado = s.Estado, pais = s.Pais })
                 .ToList(),
 
             "tanques" => (await _catalog.Tanques.Find(_ => true).ToListAsync())
-                .Select(t => new { id = t.Id, clave = t.Clave, nombre = t.Nombre, capacidad_m3 = t.CapacidadM3, tipo_producto = t.TipoProducto, planta_nombre = t.PlantaNombre })
+                .Select(t => new { id = t.Id, clave = t.Clave, nombre = t.Nombre, tipo_tanque = t.TipoProducto, planta_nombre = t.PlantaNombre, planta_clave = t.PlantaClave })
                 .ToList(),
 
             "rutas" => (await _catalog.Rutas.Find(_ => true).ToListAsync())

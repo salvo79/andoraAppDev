@@ -13,15 +13,16 @@ namespace anDora.Api.Data
             _db = client.GetDatabase(configuration["MongoSettings:OperationsDb"]);
         }
 
-        public IMongoCollection<Sitio>         Sitios       => _db.GetCollection<Sitio>("cat_sitios");
-        public IMongoCollection<Planta>        Plantas      => _db.GetCollection<Planta>("cat_plantas");
-        public IMongoCollection<Trabajador>    Trabajadores => _db.GetCollection<Trabajador>("cat_trabajadores");
+        // Nombres de colección alineados con Atlas andoraDB
+        public IMongoCollection<Sitio>         Sitios       => _db.GetCollection<Sitio>("cat_sites");
+        public IMongoCollection<Planta>        Plantas      => _db.GetCollection<Planta>("cat_plantas_proceso");
+        public IMongoCollection<Trabajador>    Trabajadores => _db.GetCollection<Trabajador>("trabajadores");
         public IMongoCollection<Proveedor>     Proveedores  => _db.GetCollection<Proveedor>("cat_proveedores");
         public IMongoCollection<Tanque>        Tanques      => _db.GetCollection<Tanque>("cat_tanques");
-        public IMongoCollection<Ruta>          Rutas        => _db.GetCollection<Ruta>("cat_rutas");
+        public IMongoCollection<Ruta>          Rutas        => _db.GetCollection<Ruta>("rutas_logisticas");
         public IMongoCollection<Producto>      Productos    => _db.GetCollection<Producto>("cat_productos");
         public IMongoCollection<Corriente>     Corrientes   => _db.GetCollection<Corriente>("cat_corrientes");
-        public IMongoCollection<PrecioCatalogo> Precios     => _db.GetCollection<PrecioCatalogo>("cat_precios");
+        public IMongoCollection<PrecioCatalogo> Precios     => _db.GetCollection<PrecioCatalogo>("cat_lista_precios");
         public IMongoCollection<Vendedor>      Vendedores  => _db.GetCollection<Vendedor>("vendedores");
         public IMongoCollection<Cliente>       Clientes    => _db.GetCollection<Cliente>("cat_clientes");
     }

@@ -30,7 +30,6 @@ namespace anDora.Api.Controllers
         public async Task<IActionResult> CreateSitio([FromBody] Sitio item)
         {
             item.Id = null;
-            item.CreadoEn = DateTime.UtcNow;
             await _ctx.Sitios.InsertOneAsync(item);
             return Ok(item);
         }
@@ -65,7 +64,6 @@ namespace anDora.Api.Controllers
         public async Task<IActionResult> CreatePlanta([FromBody] Planta item)
         {
             item.Id = null;
-            item.CreadoEn = DateTime.UtcNow;
             await _ctx.Plantas.InsertOneAsync(item);
             return Ok(item);
         }
@@ -135,7 +133,6 @@ namespace anDora.Api.Controllers
         public async Task<IActionResult> CreateProveedor([FromBody] Proveedor item)
         {
             item.Id = null;
-            item.CreadoEn = DateTime.UtcNow;
             await _ctx.Proveedores.InsertOneAsync(item);
             return Ok(item);
         }
@@ -170,7 +167,6 @@ namespace anDora.Api.Controllers
         public async Task<IActionResult> CreateTanque([FromBody] Tanque item)
         {
             item.Id = null;
-            item.CreadoEn = DateTime.UtcNow;
             await _ctx.Tanques.InsertOneAsync(item);
             return Ok(item);
         }
@@ -275,7 +271,6 @@ namespace anDora.Api.Controllers
         public async Task<IActionResult> CreateCorriente([FromBody] Corriente item)
         {
             item.Id = null;
-            item.CreadoEn = DateTime.UtcNow;
             await _ctx.Corrientes.InsertOneAsync(item);
             return Ok(item);
         }
@@ -302,10 +297,10 @@ namespace anDora.Api.Controllers
         [HttpGet("tree")]
         public async Task<IActionResult> GetTree()
         {
-            var sitios     = await _ctx.Sitios.Find(x => x.Activo).SortBy(x => x.Nombre).ToListAsync();
-            var plantas    = await _ctx.Plantas.Find(x => x.Activo).SortBy(x => x.Nombre).ToListAsync();
-            var tanques    = await _ctx.Tanques.Find(x => x.Activo).SortBy(x => x.Clave).ToListAsync();
-            var corrientes = await _ctx.Corrientes.Find(x => x.Activo).SortBy(x => x.Clave).ToListAsync();
+            var sitios     = await _ctx.Sitios.Find(_ => true).SortBy(x => x.Nombre).ToListAsync();
+            var plantas    = await _ctx.Plantas.Find(_ => true).SortBy(x => x.Nombre).ToListAsync();
+            var tanques    = await _ctx.Tanques.Find(_ => true).SortBy(x => x.Clave).ToListAsync();
+            var corrientes = await _ctx.Corrientes.Find(_ => true).SortBy(x => x.Clave).ToListAsync();
 
             var tree = new List<object>();
 
@@ -316,28 +311,27 @@ namespace anDora.Api.Controllers
                 foreach (var p in plantas.Where(p => p.SitioId == s.Id))
                 {
                     var tanqueNodes = tanques
-                        .Where(t => t.PlantaId == p.Id)
+                        .Where(t => t.PlantaClave == p.Clave || t.PlantaId == p.Id)
                         .Select(t => (object)new
                         {
                             id           = $"tanque-{t.Id}",
                             text         = $"{t.Clave} · {t.Nombre}",
                             type         = "tanque",
                             tipoProducto = t.TipoProducto,
-                            capacidadM3  = t.CapacidadM3,
-                            material     = t.Material,
+                            estatus      = t.Estatus,
                         })
                         .ToList();
 
                     plantaNodes.Add(new
                     {
-                        id           = $"planta-{p.Id}",
-                        text         = p.Nombre,
-                        type         = "planta",
-                        clave        = p.Clave,
-                        tipoPlanta   = p.Tipo,
-                        capacidadTon = p.CapacidadTon,
-                        unidad       = p.Unidad,
-                        items        = tanqueNodes,
+                        id        = $"planta-{p.Id}",
+                        text      = p.Nombre,
+                        type      = "planta",
+                        clave     = p.Clave,
+                        tipoPlanta = p.Tipo,
+                        grupo     = p.GrupoNombre,
+                        estatus   = p.Estatus,
+                        items     = tanqueNodes,
                     });
                 }
 
@@ -366,12 +360,12 @@ namespace anDora.Api.Controllers
                         type = "corriente-tipo",
                         items = g.Select(c => (object)new
                         {
-                            id             = $"corriente-{c.Id}",
-                            text           = $"{c.Clave} · {c.Nombre}",
-                            type           = "corriente",
-                            tipoCorriente  = c.TipoCorriente,
-                            unidad         = c.Unidad,
-                            productoNombre = c.ProductoNombre,
+                            id            = $"corriente-{c.Id}",
+                            text          = $"{c.Clave} · {c.Nombre}",
+                            type          = "corriente",
+                            tipoCorriente = c.TipoCorriente,
+                            unidad        = c.Unidad,
+                            esProductoFinal = c.EsProductoFinal,
                         }).ToList(),
                     })
                     .ToList();

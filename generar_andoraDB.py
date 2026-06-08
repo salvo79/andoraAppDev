@@ -46,8 +46,11 @@ random.seed(42)
 print("\n📚  Leyendo catálogos...")
 
 plantas        = list(db.cat_plantas_proceso.find())
-productos      = list(db.cat_productos.find())
-corrientes     = list(db.cat_corrientes.find())
+# Productos finales viven en cat_corrientes con es_producto_final=True
+# cat_productos está vacío en Atlas
+corrientes_all = list(db.cat_corrientes.find())
+productos      = [c for c in corrientes_all if c.get("es_producto_final", False)]
+corrientes     = corrientes_all
 recetas        = list(db.cat_recetas.find())
 clientes       = list(db.cat_clientes.find())
 puntos         = list(db.cat_puntos_entrega.find())
@@ -56,12 +59,11 @@ vendedores_cat = list(db.vendedores.find())
 sites_cat      = list(db.cat_sites.find())
 materias_cat   = list(db.materias_primas.find())
 servicios_cat  = list(db.cat_servicios.find())
-tanques_cat    = list(db.tanques.find())
+tanques_cat    = list(db.cat_tanques.find())
 presentaciones = list(db.cat_presentaciones.find())
 unidades       = list(db.cat_unidades_medida.find())
 lista_precios  = list(db.cat_lista_precios.find())
 company        = db.company.find_one() or {}
-corrientes_all = list(db.cat_corrientes.find())
 
 print(f"   Plantas      : {len(plantas)}")
 print(f"   Productos     : {len(productos)}")
@@ -92,15 +94,12 @@ def get_field(doc, *keys, default=None):
             return default
     return val
 
-# Separar productos finales de materias primas
-prods_finales = [p for p in productos if p.get("es_producto_final", False)]
-prods_mp      = [p for p in productos if not p.get("es_producto_final", True)]
-if not prods_finales:
-    prods_finales = productos[:max(1, len(productos)//2)]
+# productos ya es la lista de corrientes con es_producto_final=True
+prods_finales = productos
+# materias primas: corrientes que NO son producto final
+prods_mp = [c for c in corrientes_all if not c.get("es_producto_final", False)]
 if not prods_mp:
-    prods_mp = productos[len(prods_finales):]
-    if not prods_mp:
-        prods_mp = productos[:1]          # fallback
+    prods_mp = corrientes_all[:max(1, len(corrientes_all)//2)]
 
 # Separar corrientes
 corr_entrada = [c for c in corrientes_all if c.get("tipo") in
@@ -114,14 +113,22 @@ if not corr_salida:
     if not corr_salida:
         corr_salida = corrientes_all[-1:]
 
-# Precio de lista y costo por producto
+# Precio y costo directamente desde cat_corrientes (campos precio_lista / costo_produccion)
 def precio_producto(prod):
+    v = prod.get("precio_lista")
+    if v:
+        return float(v)
+    # fallback: buscar en cat_lista_precios por clave
+    clave = prod.get("clave", prod.get("codigo", ""))
     for lp in lista_precios:
-        if lp.get("producto_id") == prod["_id"]:
-            return float(lp.get("precio_mxn", 18500))
+        if lp.get("corriente_clave") == clave or lp.get("producto_clave") == clave:
+            return float(lp.get("precio_mxn", lp.get("precio", 18500)))
     return round(random.uniform(12000, 25000), 2)
 
 def costo_producto(prod):
+    v = prod.get("costo_produccion")
+    if v:
+        return float(v)
     return round(precio_producto(prod) * random.uniform(0.55, 0.72), 2)
 
 precio_by_prod = {p["_id"]: precio_producto(p) for p in productos}
@@ -163,6 +170,11 @@ def costo_mp(corriente):
 # Nombre de vendedor
 def vendedor_nombre(v):
     return v.get("nombre") or v.get("name") or "Vendedor Genérico"
+
+# Lookup rápido de vendedor por _id
+vendedor_by_id = {v["_id"]: v for v in vendedores_cat}
+
+CANALES_VENTA = ["directo", "distribuidor", "exportacion", "convenio"]
 
 # ────────────────────────────────────────────────────────────────────
 #  PASO 2 ▸  Limpiar colecciones operativas
@@ -294,7 +306,13 @@ BATCH = 500     # insertar cada N días
 def flush(force=False):
     for col, docs in BUF.items():
         if docs and (force or len(docs) >= BATCH):
-            db[col].insert_many(docs, ordered=False)
+            try:
+                db[col].insert_many(docs, ordered=False)
+            except BulkWriteError as bwe:
+                # ignore duplicate key errors (11000), re-raise others
+                non_dup = [e for e in bwe.details.get("writeErrors", []) if e.get("code") != 11000]
+                if non_dup:
+                    raise
             docs.clear()
 
 # ────── recetas mapeadas ──────────────────────────────────────────
@@ -373,9 +391,9 @@ for dia_idx in range(total_dias):
         # Asignar producto final según index de planta
         prod_final = prods_finales[plantas.index(planta) % len(prods_finales)]
         pf_id      = prod_final["_id"]
-        pf_codigo  = prod_final.get("codigo", "PF-001")
+        pf_codigo  = prod_final.get("clave", prod_final.get("codigo", "PF-001"))
         pf_nombre  = prod_final.get("nombre", "Producto Final")
-        pf_familia = prod_final.get("familia", "producto_final")
+        pf_familia = prod_final.get("subfamilia", prod_final.get("familia", "producto_final"))
         pf_precio  = precio_by_prod[pf_id]
         pf_costo   = costo_by_prod[pf_id]
 
@@ -394,7 +412,7 @@ for dia_idx in range(total_dias):
             # producto MP asociado
             prod_mp = prods_mp[i_c % max(1, len(prods_mp))]
             mp_id   = prod_mp["_id"]
-            mp_cod  = prod_mp.get("codigo", f"MP-{i_c+1:03d}")
+            mp_cod  = prod_mp.get("clave", prod_mp.get("codigo", f"MP-{i_c+1:03d}"))
             mp_nom  = prod_mp.get("nombre", corr.get("nombre", "Materia Prima"))
             mp_cost = costo_mp_by_prod.get(mp_id, 42.5)
             mp_costo_total = round(mp_kg_corr * mp_cost, 2)
@@ -571,16 +589,20 @@ for dia_idx in range(total_dias):
         if fecha.day == 1:
             for i_mp, prod_mp_c in enumerate(prods_mp):
                 prov_id = prov_ids[i_mp % len(prov_ids)]
-                mp_cod_c = prod_mp_c.get("codigo", f"MP-{i_mp+1:03d}")
+                mp_cod_c = prod_mp_c.get("clave", prod_mp_c.get("codigo", f"MP-{i_mp+1:03d}"))
                 mp_nom_c = prod_mp_c.get("nombre", "Materia Prima")
                 mp_cost_c = costo_mp_by_prod.get(prod_mp_c["_id"], 42.5)
                 qty_compra = round(cap_nom * 0.9 * random.uniform(25, 32), 2)
                 total_c    = round(qty_compra * mp_cost_c, 2)
                 compras_dia += 1
+                folio_oc = f"OC-{fecha.year}{fecha.month:02d}-{i_mp+1:03d}-{len(BUF['ordenes_compra_venta'])+1:04d}"
                 BUF["ordenes_compra_venta"].append({
                     "_id":              ObjectId(),
+                    "folio":            folio_oc,
                     "tipo":             "compra",
+                    "tipo_orden":       "compra",
                     "fecha":            fecha,
+                    "company_id":       company_id,
                     "proveedor_id":     prov_id,
                     "planta_id":        pid_planta,
                     "planta_clave":     p_clave,
@@ -593,7 +615,7 @@ for dia_idx in range(total_dias):
                     "subtotal":         total_c,
                     "iva_mxn":          round(total_c * 0.16, 2),
                     "total":            round(total_c * 1.16, 2),
-                    "estatus":          "recibida",
+                    "estatus":          "cerrada",
                     "created_at":       fecha,
                 })
 
@@ -605,7 +627,7 @@ for dia_idx in range(total_dias):
     for _ in range(n_ventas):
         prod_v    = random.choice(prods_finales)
         pv_id     = prod_v["_id"]
-        pv_cod    = prod_v.get("codigo", "PF-001")
+        pv_cod    = prod_v.get("clave", prod_v.get("codigo", "PF-001"))
         pv_nom    = prod_v.get("nombre", "Producto Final")
         pv_precio = precio_by_prod[pv_id]
         pv_costo  = costo_by_prod[pv_id]
@@ -624,7 +646,11 @@ for dia_idx in range(total_dias):
         cliente_v    = random.choice(clientes) if clientes else {"_id": ObjectId(), "codigo": "CLI-001", "nombre": "Cliente Genérico"}
         cid_v        = cliente_v["_id"]
         punto_v      = random.choice(puntos) if puntos else {"_id": ObjectId(), "codigo": "PE-001", "nombre": "Punto Entrega"}
-        vendedor_v   = vendedor_for_cliente(cid_v)
+        vendedor_vid = vendedor_for_cliente(cid_v)
+        vendedor_doc = vendedor_by_id.get(vendedor_vid, {})
+        vend_codigo  = vendedor_doc.get("codigo", vendedor_doc.get("clave", "VEN-001"))
+        vend_nombre  = vendedor_nombre(vendedor_doc)
+        canal_v      = random.choice(CANALES_VENTA)
 
         coms_pct  = round(random.uniform(0.02, 0.04), 4)
         coms_mxn  = round((subtotal - desc_mxn) * coms_pct, 2)
@@ -649,8 +675,12 @@ for dia_idx in range(total_dias):
             "company_id":       company_id,
             "site_id":          site_id,
             "cliente_id":       cid_v,
-            "cliente_codigo":   cliente_v.get("codigo", "CLI-001"),
+            "cliente_codigo":   cliente_v.get("codigo", cliente_v.get("clave", "CLI-001")),
             "cliente_nombre":   cliente_v.get("nombre", "Cliente"),
+            "vendedor_id":      vendedor_vid,
+            "vendedor_codigo":  vend_codigo,
+            "vendedor_nombre":  vend_nombre,
+            "canal":            canal_v,
             "punto_entrega_id": punto_v["_id"],
             "punto_entrega":    punto_v.get("nombre", "Almacén"),
             "producto_id":      pv_id,
@@ -667,37 +697,37 @@ for dia_idx in range(total_dias):
             "precio_neto":      precio_neto,
             "precio_envase":    0,
             "subtotal":         subtotal,
+            "subtotal_mxn":     subtotal,
             "iva_pct":          0.16,
             "iva_mxn":          iva_mxn,
             "total_linea":      total_mxn,
+            "total_mxn":        total_mxn,
             "moneda":           "MXN",
             "costo_unitario":   pv_costo,
             "costo_total":      costo_total,
+            "costo_total_mxn":  costo_total,
             "margen_mxn":       margen_mxn,
             "margen_pct":       margen_pct,
+            "margen_total_mxn": margen_mxn,
+            "margen_total_pct": margen_pct,
+            "flete_mxn":        round(cantidad_ton * random.uniform(0, 200), 2),
+            "envases_mxn":      0,
             "lote_id":          ObjectId(),
             "numero_lote":      lote_v,
             "inventario_id":    None,
             "comision_pct":     coms_pct,
             "comision_mxn":     coms_mxn,
-            "activo":           True,
-            "subtotal_mxn":     subtotal,
-            "descuento_mxn":    desc_mxn,
-            "flete_mxn":        round(cantidad_ton * random.uniform(0, 200), 2),
-            "envases_mxn":      0,
-            "iva_mxn":          iva_mxn,
-            "total_mxn":        total_mxn,
-            "costo_total_mxn":  costo_total,
-            "margen_total_mxn": margen_mxn,
-            "margen_total_pct": margen_pct,
             "comision": {
-                "vendedor_id":   vendedor_v,
+                "vendedor_id":   vendedor_vid,
+                "vendedor_codigo": vend_codigo,
+                "vendedor_nombre": vend_nombre,
                 "base_calculo":  subtotal - desc_mxn,
                 "porcentaje":    coms_pct,
                 "monto_mxn":     coms_mxn,
                 "estatus":       "pendiente",
                 "fecha_pago":    None,
             },
+            "activo":           True,
             "estatus":          random.choice(["entregada","facturada","facturada","facturada"]),
             "observaciones":    f"Venta {pv_nom} {cantidad_ton} ton cliente",
             "created_at":       fecha,
@@ -729,7 +759,7 @@ for dia_idx in range(total_dias):
     # Resumen por producto
     for pf in prods_finales:
         pf_id2  = pf["_id"]
-        pf_cod2 = pf.get("codigo", "PF-001")
+        pf_cod2 = pf.get("clave", pf.get("codigo", "PF-001"))
         pf_nom2 = pf.get("nombre", "Producto")
         prod_q  = prod_dia_total.get(pf_id2, 0)
         BUF["resumen_diario_producto"].append({
