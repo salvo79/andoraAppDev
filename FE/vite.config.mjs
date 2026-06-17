@@ -19,7 +19,7 @@ export default defineConfig({
             'devexpress-dashboard/designer/text-box-item-editor-extension'
         ]
     },
-    base: process.env.DEPLOY_TARGET === 'gh-pages' ? '/landing/' : '/',
+    base: process.env.DEPLOY_TARGET === 'gh-pages' ? '/andoraAppDev/' : '/',
     plugins: [
         vue(),
         tailwindcss(),
