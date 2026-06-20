@@ -2,6 +2,7 @@
 import ProcessTreeDock  from '@/components/historiador/ProcessTreeDock.vue';
 import TrendAnalysis    from '@/components/historiador/TrendAnalysis.vue';
 import VarBuilderDock   from '@/components/historiador/VarBuilderDock.vue';
+import { DxSplitter, DxItem } from 'devextreme-vue/splitter';
 import { computed, ref, watch, onMounted, onUnmounted } from 'vue';
 import { useAuthStore }    from '@/stores/authStore.js';
 import historianService    from '@/service/historianService.js';
@@ -41,10 +42,8 @@ const atlasIcon = computed(() => ({
 // ══════════════════════════════════════════════════════════════════════════════
 // DOCKS
 // ══════════════════════════════════════════════════════════════════════════════
-const leftOpen  = ref(true);
-const rightOpen = ref(false);
-const LEFT_W    = 240;
-const RIGHT_W   = 270;
+const leftCollapsed  = ref(false);
+const rightCollapsed = ref(true);
 
 // ══════════════════════════════════════════════════════════════════════════════
 // TABS
@@ -122,7 +121,9 @@ function clearAnalysis() {
 // ══════════════════════════════════════════════════════════════════════════════
 // MÉTRICAS OPERATIVAS (Producción / Compras / Ventas desde Atlas)
 // ══════════════════════════════════════════════════════════════════════════════
-const metricLoading = ref(false);
+const metricLoading    = ref(false);
+const dropActive       = ref(false);
+const pendingDragTags  = ref([]);
 
 async function addMetric(metricData) {
     const tab = activeTab.value;
@@ -166,13 +167,14 @@ watch(() => activeTab.value?.range, async (newRange) => {
     }
 });
 
-// Drop zone: recibe métricas arrastradas desde el árbol de operaciones
+// Drop zone exterior: solo recibe métricas operativas; los tags los maneja TrendAnalysis
 function onMetricDrop(e) {
-    const raw = e.dataTransfer.getData('application/andora-metric');
-    if (!raw) return;
-    try {
-        addMetric(JSON.parse(raw));
-    } catch { /* ignore malformed data */ }
+    dropActive.value = false;
+    pendingDragTags.value = [];
+    const rawMetric = e.dataTransfer.getData('application/andora-metric');
+    if (rawMetric) {
+        try { addMetric(JSON.parse(rawMetric)); } catch { /* ignore */ }
+    }
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -485,12 +487,12 @@ function fmtDate(d) {
         <div class="vs-toolbar">
 
             <!-- Toggle docks -->
-            <button class="vs-tbtn" :class="leftOpen  ? 'vs-tbtn-active' : ''"
-                    title="Árbol de Proceso" @click="leftOpen = !leftOpen">
+            <button class="vs-tbtn" :class="!leftCollapsed  ? 'vs-tbtn-active' : ''"
+                    title="Árbol de Proceso" @click="leftCollapsed = !leftCollapsed">
                 <i class="pi pi-list" />
             </button>
-            <button class="vs-tbtn" :class="rightOpen ? 'vs-tbtn-active' : ''"
-                    title="Constructor de Variables" @click="rightOpen = !rightOpen">
+            <button class="vs-tbtn" :class="!rightCollapsed ? 'vs-tbtn-active' : ''"
+                    title="Constructor de Variables" @click="rightCollapsed = !rightCollapsed">
                 <i class="pi pi-calculator" />
             </button>
 
@@ -567,54 +569,73 @@ function fmtDate(d) {
              WORKSPACE
         ════════════════════════════════════════════════════════════════ -->
         <div class="vs-workspace">
+            <DxSplitter orientation="horizontal" style="height:100%;width:100%">
 
-            <!-- Dock izquierdo: Árbol de proceso -->
-            <div class="vs-dock vs-dock-left"
-                 :style="leftOpen ? `width:${LEFT_W}px` : 'width:28px'">
-                <div v-if="!leftOpen" class="vs-dock-collapsed" @click="leftOpen = true">
-                    <span>Árbol de Proceso</span>
-                </div>
-                <div v-else class="vs-dock-content h-full">
-                   
-                </div>
-            </div>
+                <!-- Dock izquierdo: Árbol de proceso -->
+                <DxItem v-model:collapsed="leftCollapsed"
+                        :collapsible="true"
+                        size="240px"
+                        collapsed-size="28px"
+                        min-size="28px"
+                        max-size="420px">
+                    <div v-if="leftCollapsed" class="vs-dock-collapsed vs-dock-left-strip"
+                         @click="leftCollapsed = false">
+                        <span>Árbol de Proceso</span>
+                    </div>
+                    <div v-else class="vs-dock-content h-full">
+                        <ProcessTreeDock @add-tag="addTag" @drag-tags="pendingDragTags = $event" />
+                    </div>
+                </DxItem>
 
-            <!-- Centro: análisis (también es drop zone para métricas operativas) -->
-            <div class="vs-center flex-1"
-                 @dragover.prevent
-                 @drop="onMetricDrop">
-                <TrendAnalysis
-                    v-if="activeTab"
-                    :key="activeId"
-                    :tags="activeTab.tags"
-                    :calc-vars="activeTab.calcVars"
-                    :oper-metrics="activeTab.operMetrics || []"
-                    :range="activeTab.range"
-                    @remove-tag="removeTag"
-                    @remove-metric="removeMetric"
-                />
-                <!-- Indicador de carga de métrica -->
-                <div v-if="metricLoading" class="vs-metric-loading">
-                    <i class="pi pi-spin pi-spinner" /> Cargando datos de Atlas...
-                </div>
-            </div>
+                <!-- Centro: análisis (también es drop zone para métricas operativas) -->
+                <DxItem>
+                    <div class="vs-center h-full"
+                         @dragover.prevent
+                         @dragenter.prevent="dropActive = true"
+                         @dragleave="dropActive = false"
+                         @drop.prevent="onMetricDrop"
+                         :class="{ 'vs-drop-active': dropActive }">
+                        <TrendAnalysis
+                            v-if="activeTab"
+                            :key="activeId"
+                            :tags="activeTab.tags"
+                            :calc-vars="activeTab.calcVars"
+                            :oper-metrics="activeTab.operMetrics || []"
+                            :range="activeTab.range"
+                            :pending-drag-tags="pendingDragTags"
+                            @remove-tag="removeTag"
+                            @remove-metric="removeMetric"
+                            @drop-tags="tags => tags.forEach(addTag)"
+                        />
+                        <div v-if="metricLoading" class="vs-metric-loading">
+                            <i class="pi pi-spin pi-spinner" /> Cargando datos de Atlas...
+                        </div>
+                    </div>
+                </DxItem>
 
-            <!-- Dock derecho: Constructor de variables -->
-            <div class="vs-dock vs-dock-right"
-                 :style="rightOpen ? `width:${RIGHT_W}px` : 'width:28px'">
-                <div v-if="!rightOpen" class="vs-dock-collapsed" @click="rightOpen = true">
-                    <span>Constructor de Variables</span>
-                </div>
-                <div v-else class="vs-dock-content h-full overflow-y-auto">
-                    <VarBuilderDock
-                        v-if="activeTab"
-                        :tags="activeTab.tags"
-                        :range="activeTab.range"
-                        @add-calc-var="addCalcVar"
-                        @remove-calc-var="removeCalcVar"
-                    />
-                </div>
-            </div>
+                <!-- Dock derecho: Constructor de variables -->
+                <DxItem v-model:collapsed="rightCollapsed"
+                        :collapsible="true"
+                        size="270px"
+                        collapsed-size="28px"
+                        min-size="28px"
+                        max-size="420px">
+                    <div v-if="rightCollapsed" class="vs-dock-collapsed vs-dock-right-strip"
+                         @click="rightCollapsed = false">
+                        <span>Constructor de Variables</span>
+                    </div>
+                    <div v-else class="vs-dock-content h-full overflow-y-auto">
+                        <VarBuilderDock
+                            v-if="activeTab"
+                            :tags="activeTab.tags"
+                            :range="activeTab.range"
+                            @add-calc-var="addCalcVar"
+                            @remove-calc-var="removeCalcVar"
+                        />
+                    </div>
+                </DxItem>
+
+            </DxSplitter>
         </div>
 
         <!-- ════════════════════════════════════════════════════════════════
@@ -1017,36 +1038,30 @@ function fmtDate(d) {
 .vs-tab-add:hover { color: var(--p-primary-color); }
 
 /* ── Workspace ─────────────────────────────────────────────────────────────── */
-.vs-workspace { display: flex; flex: 1; min-height: 0; overflow: hidden; }
+.vs-workspace { flex: 1; min-height: 0; overflow: hidden; }
 
-/* ── Docks ─────────────────────────────────────────────────────────────────── */
-.vs-dock {
-    display: flex; flex-direction: column;
-    border-right: 1px solid var(--p-surface-300);
-    background: var(--p-surface-50);
-    transition: width 0.2s ease;
-    overflow: hidden; min-height: 0;
-}
-.vs-dock-right { border-right: none; border-left: 1px solid var(--p-surface-300); }
-
+/* ── Dock strips (collapsed state inside DxSplitter pane) ─────────────────── */
 .vs-dock-collapsed {
     display: flex; align-items: center; justify-content: center;
-    height: 100%; cursor: pointer;
+    height: 100%; width: 100%; cursor: pointer;
     writing-mode: vertical-rl; text-orientation: mixed;
     font-size: 0.68rem; font-weight: 700;
     text-transform: uppercase; letter-spacing: 0.06em;
     color: var(--p-text-muted-color); padding: 10px 0;
     background: var(--p-surface-100);
-    border-right: 2px solid var(--p-primary-color);
 }
-.vs-dock-right .vs-dock-collapsed {
-    border-right: none; border-left: 2px solid var(--p-primary-color);
-}
+.vs-dock-left-strip  { border-right: 2px solid var(--p-primary-color); }
+.vs-dock-right-strip { border-left:  2px solid var(--p-primary-color); }
 .vs-dock-collapsed:hover { color: var(--p-primary-color); background: var(--p-surface-200); }
-.vs-dock-content { display: flex; flex-direction: column; width: 100%; overflow: hidden; }
+.vs-dock-content { display: flex; flex-direction: column; width: 100%; height: 100%; overflow: hidden; }
 
-/* ── Centro / Status bar ───────────────────────────────────────────────────── */
-.vs-center { overflow: hidden; min-height: 0; position: relative; }
+/* ── Centro ────────────────────────────────────────────────────────────────── */
+.vs-center { overflow: hidden; min-height: 0; height: 100%; position: relative; }
+.vs-drop-active {
+    outline: 2px dashed var(--p-primary-color);
+    outline-offset: -4px;
+    background: var(--p-primary-50, rgba(59,130,246,0.04));
+}
 
 .vs-metric-loading {
     position: absolute; bottom: 12px; right: 16px; z-index: 50;

@@ -70,6 +70,12 @@ const routes = [
                 meta: { breadcrumb: ['Seguimiento Operativo'] },
                 component: () => import('@/views/seguimiento/HistoriadorView.vue')
             },
+            {
+                path: '/seguimiento/planta',
+                name: 'planta-proceso',
+                meta: { breadcrumb: ['Seguimiento Operativo', 'Diseño de Planta'] },
+                component: () => import('@/views/seguimiento/PlantaView.vue')
+            },
 
             // ── Programación Operativa ───────────────────────────────────────
             {

@@ -30,6 +30,11 @@ const model = ref([
                 label: 'Historiador',
                 icon: 'pi pi-fw pi-chart-line',
                 to: '/seguimiento'
+            },
+            {
+                label: 'Diseño de Planta',
+                icon: 'pi pi-fw pi-sitemap',
+                to: '/seguimiento/planta'
             }
         ]
     },
